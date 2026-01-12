@@ -1,0 +1,116 @@
+session_id: asterisk-onboard-2026-01-11
+created_at: 2026-01-11T22:16:00Z
+status: active
+project: asterisk
+
+goal:
+  primary: "Add new features - Build out the form detection or AI analysis capabilities"
+  context: "User wants to enhance the Asterisk form detection and AI analysis features"
+
+tech_stack:
+  language: TypeScript
+  runtime: Tauri (Rust + TypeScript)
+  framework: Tauri v2
+  frontend: Vite + TypeScript
+  package_manager: npm
+  structure: Monorepo with desktop app
+
+build_commands:
+  dev: "cd apps/desktop && npm run tauri dev"
+  build: "cd apps/desktop && npm run tauri build"
+  install: "npm install (from root)"
+
+test_commands:
+  status: "No test framework detected yet"
+  recommendation: "Consider adding vitest or jest for TypeScript tests"
+
+project_structure:
+  entry_points:
+    - "apps/desktop/src-tauri/src/main.rs - Tauri Rust backend entry point"
+    - "apps/desktop/src/main.ts - Frontend TypeScript entry point"
+    - "apps/desktop/src-tauri/tauri.conf.json - Tauri configuration"
+
+  key_directories:
+    - "apps/desktop/ - Main Tauri desktop application"
+    - "apps/desktop/src/ - Frontend source (TypeScript)"
+    - "apps/desktop/src-tauri/ - Rust backend (Tauri runtime)"
+    - ".github/workflows/ - CI/CD pipelines (build, test, release)"
+    - "thoughts/ - Project documentation and continuity ledgers"
+
+architecture:
+  pattern: "Tauri desktop application (Rust backend + TypeScript frontend)"
+  features:
+    - "Form detection capabilities"
+    - "AI analysis integration"
+    - "Desktop app with native Rust performance"
+
+  tech_choices:
+    - "Tauri v2 for cross-platform desktop with web technologies"
+    - "Vite for fast frontend development"
+    - "TypeScript for type-safe frontend code"
+    - "Rust for performant native backend"
+
+ci_cd:
+  platform: "GitHub Actions"
+  workflows:
+    - ".github/workflows/build.yml - Build verification"
+    - ".github/workflows/test.yml - Test suite"
+    - ".github/workflows/release.yml - Release automation"
+
+constraints:
+  - "Follow Tauri v2 architecture patterns"
+  - "Maintain TypeScript + Rust separation of concerns"
+  - "Use monorepo structure (apps/desktop)"
+  - "Coordinate with cross-terminal database if multiple sessions active"
+
+state:
+  now: "→ Initial onboarding complete"
+  next: "Begin feature development for form detection or AI analysis"
+  blockers: []
+
+working_set:
+  key_files:
+    - "apps/desktop/src-tauri/src/main.rs"
+    - "apps/desktop/src/main.ts"
+    - "apps/desktop/src-tauri/tauri.conf.json"
+    - "apps/desktop/package.json"
+
+  documentation:
+    - "README.md - Project overview with CI/CD badges"
+    - "AGENTS.md - Agent documentation (present in git status)"
+    - "thoughts/ - Continuity and planning docs"
+
+open_questions:
+  - "UNCONFIRMED: What specific form detection features are needed?"
+  - "UNCONFIRMED: Which AI analysis capabilities should be prioritized?"
+  - "UNCONFIRMED: Are there existing form detection algorithms in the codebase?"
+  - "UNCONFIRMED: What AI models/APIs should be integrated?"
+  - "UNCONFIRMED: Should tests be added before new features?"
+
+codebase_summary: |
+  Asterisk is a Tauri v2 monorepo desktop application combining Rust backend
+  performance with TypeScript frontend flexibility. The project focuses on form
+  detection and AI analysis capabilities. Currently has CI/CD via GitHub Actions
+  with build, test, and release pipelines. The monorepo structure places the main
+  desktop app in apps/desktop/ with clear separation between Rust backend
+  (src-tauri/) and TypeScript frontend (src/). The project uses modern tooling
+  (Vite, TypeScript) and appears to be in early development stages with core
+  infrastructure in place.
+
+next_steps:
+  immediate:
+    - "Explore existing form detection code (if any) in apps/desktop/src/"
+    - "Review AI analysis integration points"
+    - "Determine which features to build first"
+
+  recommended:
+    - "Set up testing framework (vitest recommended for TypeScript)"
+    - "Document form detection requirements"
+    - "Plan AI model integration architecture"
+
+session_notes:
+  - "Project detected as Tauri v2 monorepo"
+  - "User goal: Feature development (form detection + AI analysis)"
+  - "No test framework detected - may need to add"
+  - "CI/CD already configured via GitHub Actions"
+  - "Cross-terminal coordination available via PostgreSQL database"

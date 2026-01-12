@@ -1,0 +1,97 @@
+---
+session: asterisk
+date: 2026-01-11
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Create Asterisk monorepo scaffold with Tauri desktop app and vault plumbing
+now: Push to remote repository and begin form detection implementation
+
+test: pnpm build && cargo test -p asterisk-vault
+
+done_this_session:
+  - task: Created monorepo root with pnpm + Turborepo + Cargo workspace
+    files: [package.json, pnpm-workspace.yaml, turbo.json, Cargo.toml]
+  - task: Added MPL-2.0 license and comprehensive README
+    files: [LICENSE, README.md]
+  - task: Created documentation (architecture, data-separation, threat-model)
+    files: [docs/architecture.md, docs/data-separation.md, docs/threat-model.md]
+  - task: Built TypeScript core package with shared types
+    files: [packages/core/src/types.ts, packages/core/src/index.ts]
+  - task: Implemented Rust vault crate with VaultStore trait and InMemoryStore
+    files: [crates/vault/src/lib.rs, crates/vault/Cargo.toml]
+  - task: Created Tauri desktop app with React UI for vault management
+    files: [apps/desktop/src/App.tsx, apps/desktop/src-tauri/src/lib.rs]
+  - task: Generated all required app icons
+    files: [apps/desktop/src-tauri/icons/]
+  - task: Committed all work to git
+    files: []
+
+blockers: []
+
+questions:
+  - Where to push the remote repository?
+  - What form detection approach to use next?
+
+decisions:
+  - trait_based_vault: Used VaultStore trait for easy backend swapping (in-memory now, encrypted later)
+  - form_expert_separation: Strict separation between Form Expert and User Vault for security
+  - tauri_v2: Used Tauri 2.x with latest plugin architecture
+  - mpl_license: Mozilla Public License 2.0 for copyleft with file-level scope
+
+findings:
+  - tauri_beforeDevCommand: Setting dev script to "tauri dev" causes infinite loop; keep it as "vite"
+  - icon_generation: Use `pnpm tauri icon` with absolute paths from desktop directory
+  - turbo_v2: Must use "tasks" not "pipeline" in turbo.json for v2
+
+worked:
+  - VaultStore trait allows clean backend swapping
+  - Chrono for timestamp handling in vault items
+  - Tauri IPC with serde JSON for type conversion
+
+failed:
+  - Initial icon creation with base64 (CRC errors)
+  - beforeDevCommand = "tauri dev" (infinite recursion)
+
+next:
+  - Push to GitHub remote repository
+  - Add GitHub Actions CI/CD pipeline
+  - Implement form detection browser extension or content script
+  - Add encrypted file storage backend for vault
+  - Implement OS keychain integration for master key
+
+files:
+  created:
+    - package.json
+    - pnpm-workspace.yaml
+    - turbo.json
+    - Cargo.toml
+    - LICENSE
+    - README.md
+    - .editorconfig
+    - .gitignore
+    - docs/architecture.md
+    - docs/data-separation.md
+    - docs/threat-model.md
+    - packages/core/package.json
+    - packages/core/tsconfig.json
+    - packages/core/src/types.ts
+    - packages/core/src/index.ts
+    - crates/vault/Cargo.toml
+    - crates/vault/src/lib.rs
+    - apps/desktop/package.json
+    - apps/desktop/tsconfig.json
+    - apps/desktop/vite.config.ts
+    - apps/desktop/index.html
+    - apps/desktop/src/main.tsx
+    - apps/desktop/src/App.tsx
+    - apps/desktop/src/App.css
+    - apps/desktop/src/index.css
+    - apps/desktop/src-tauri/Cargo.toml
+    - apps/desktop/src-tauri/tauri.conf.json
+    - apps/desktop/src-tauri/build.rs
+    - apps/desktop/src-tauri/src/main.rs
+    - apps/desktop/src-tauri/src/lib.rs
+    - apps/desktop/src-tauri/icons/icon.svg
+  modified: []
