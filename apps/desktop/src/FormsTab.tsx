@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+
+// Check if we're running in Tauri context
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 // Mirror the JSON types from Rust
 interface FormSnapshotJson {
@@ -40,7 +42,21 @@ export function FormsTab() {
     try {
       setLoading(true);
       setError(null);
-      const result = await invoke<FormSnapshotJson | null>('get_latest_form_snapshot');
+
+      let result: FormSnapshotJson | null = null;
+
+      if (isTauri) {
+        // Use Tauri IPC when in desktop app
+        const { invoke } = await import('@tauri-apps/api/core');
+        result = await invoke<FormSnapshotJson | null>('get_latest_form_snapshot');
+      } else {
+        // Browser fallback: fetch from HTTP API
+        const response = await fetch('http://127.0.0.1:17373/v1/form-snapshots');
+        if (response.ok) {
+          result = await response.json();
+        }
+      }
+
       setSnapshot(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

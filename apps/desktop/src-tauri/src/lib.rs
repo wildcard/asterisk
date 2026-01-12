@@ -314,6 +314,27 @@ fn start_http_server(snapshot_store: Arc<Mutex<Option<FormSnapshotJson>>>) {
                 continue;
             }
 
+            // Route: GET /v1/form-snapshots (for browser fallback)
+            if method == "GET" && url == "/v1/form-snapshots" {
+                let json_response = match snapshot_store.lock() {
+                    Ok(store) => match &*store {
+                        Some(snapshot) => serde_json::to_string(snapshot).unwrap_or_else(|_| "null".to_string()),
+                        None => "null".to_string(),
+                    },
+                    Err(_) => "null".to_string(),
+                };
+                let mut response = Response::from_string(json_response);
+                response.add_header(
+                    Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                        .unwrap(),
+                );
+                for header in cors_headers {
+                    response.add_header(header);
+                }
+                let _ = request.respond(response);
+                continue;
+            }
+
             // Route: POST /v1/form-snapshots
             if method == "POST" && url == "/v1/form-snapshots" {
                 let mut body = String::new();

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asterisk Form Detection Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; }
+    form {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: #555;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 15px;
+      background: #e8f5e9;
+      border-radius: 4px;
+      color: #2e7d32;
+    }
+  </style>
+</head>
+<body>
+  <h1>Asterisk Test Form</h1>
+  <p>This page tests form detection. Click on any field to trigger the extension.</p>
+
+  <form id="testForm">
+    <div class="form-group">
+      <label for="firstName">First Name</label>
+      <input type="text" id="firstName" name="firstName" placeholder="Enter your first name" required autocomplete="given-name">
+    </div>
+
+    <div class="form-group">
+      <label for="lastName">Last Name</label>
+      <input type="text" id="lastName" name="lastName" placeholder="Enter your last name" required autocomplete="family-name">
+    </div>
+
+    <div class="form-group">
+      <label for="email">Email Address</label>
+      <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email">
+    </div>
+
+    <div class="form-group">
+      <label for="phone">Phone Number</label>
+      <input type="tel" id="phone" name="phone" placeholder="+1 (555) 000-0000" autocomplete="tel">
+    </div>
+
+    <div class="form-group">
+      <label for="country">Country</label>
+      <select id="country" name="country" autocomplete="country">
+        <option value="">Select a country</option>
+        <option value="US">United States</option>
+        <option value="CA">Canada</option>
+        <option value="UK">United Kingdom</option>
+        <option value="AU">Australia</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="message">Message</label>
+      <textarea id="message" name="message" rows="4" placeholder="Type your message here..."></textarea>
+    </div>
+
+    <button type="submit">Submit</button>
+  </form>
+
+  <div class="status">
+    <strong>Expected behavior:</strong><br>
+    When you click on any form field, the Asterisk extension should detect this form and send its structure to the desktop app. Check the desktop app's "Forms" tab to see the detected fields.
+  </div>
+
+  <script>
+    document.getElementById('testForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      alert('Form submitted! (This is just a test - no data sent)');
+    });
+  </script>
+</body>
+</html>
