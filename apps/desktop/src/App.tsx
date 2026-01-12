@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import FormsTab from './FormsTab';
 import MatchingPanel from './MatchingPanel';
+import SettingsTab from './SettingsTab';
 import './App.css';
 
 // Check if we're running in Tauri context
@@ -29,7 +30,7 @@ interface VaultItem {
   };
 }
 
-type TabId = 'vault' | 'forms' | 'match';
+type TabId = 'vault' | 'forms' | 'match' | 'settings';
 
 // ============================================================================
 // Vault Tab Component
@@ -318,12 +319,19 @@ function App() {
         >
           Match
         </button>
+        <button
+          className={`tab-button ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          Settings
+        </button>
       </nav>
 
       <main className="main">
         {activeTab === 'vault' && <VaultTab />}
         {activeTab === 'forms' && <FormsTab />}
         {activeTab === 'match' && <MatchingPanel />}
+        {activeTab === 'settings' && <SettingsTab />}
       </main>
     </div>
   );
