@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { useEffect, useState, useCallback } from 'react';
 import FormsTab from './FormsTab';
+import MatchingPanel from './MatchingPanel';
 import './App.css';
+
+// Check if we're running in Tauri context
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 // ============================================================================
 // Types
@@ -26,7 +29,7 @@ interface VaultItem {
   };
 }
 
-type TabId = 'vault' | 'forms';
+type TabId = 'vault' | 'forms' | 'match';
 
 // ============================================================================
 // Vault Tab Component
@@ -43,23 +46,36 @@ function VaultTab() {
   const [label, setLabel] = useState('');
   const [category, setCategory] = useState<string>('contact');
 
-  // Load vault items on mount
-  useEffect(() => {
-    loadItems();
-  }, []);
-
-  const loadItems = async () => {
+  // Load vault items
+  const loadItems = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const result = await invoke<VaultItem[]>('vault_list');
+
+      let result: VaultItem[] = [];
+
+      if (isTauri) {
+        const { invoke } = await import('@tauri-apps/api/core');
+        result = await invoke<VaultItem[]>('vault_list');
+      } else {
+        const response = await fetch('http://127.0.0.1:17373/v1/vault');
+        if (response.ok) {
+          result = await response.json();
+        }
+      }
+
       setItems(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Load vault items on mount
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +106,16 @@ function VaultTab() {
         },
       };
 
-      await invoke('vault_set', { key, item: newItem });
+      if (isTauri) {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('vault_set', { key, item: newItem });
+      } else {
+        await fetch('http://127.0.0.1:17373/v1/vault', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newItem),
+        });
+      }
 
       // Clear form
       setKey('');
@@ -115,7 +140,16 @@ function VaultTab() {
     try {
       setLoading(true);
       setError(null);
-      await invoke('vault_delete', { key: itemKey });
+
+      if (isTauri) {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('vault_delete', { key: itemKey });
+      } else {
+        await fetch(`http://127.0.0.1:17373/v1/vault?key=${encodeURIComponent(itemKey)}`, {
+          method: 'DELETE',
+        });
+      }
+
       await loadItems();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -278,11 +312,18 @@ function App() {
         >
           Forms
         </button>
+        <button
+          className={`tab-button ${activeTab === 'match' ? 'active' : ''}`}
+          onClick={() => setActiveTab('match')}
+        >
+          Match
+        </button>
       </nav>
 
       <main className="main">
         {activeTab === 'vault' && <VaultTab />}
         {activeTab === 'forms' && <FormsTab />}
+        {activeTab === 'match' && <MatchingPanel />}
       </main>
     </div>
   );

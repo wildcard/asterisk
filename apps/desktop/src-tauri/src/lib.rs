@@ -13,7 +13,7 @@ use tiny_http::{Header, Response, Server};
 
 /// Application state holding the vault store
 pub struct AppState {
-    pub vault: Mutex<Box<dyn VaultStore>>,
+    pub vault: Arc<Mutex<Box<dyn VaultStore>>>,
 }
 
 /// Separate state for form snapshots (NOT part of vault)
@@ -263,7 +263,10 @@ fn get_latest_form_snapshot(
 // HTTP Server for Extension Bridge
 // ============================================================================
 
-fn start_http_server(snapshot_store: Arc<Mutex<Option<FormSnapshotJson>>>) {
+fn start_http_server(
+    snapshot_store: Arc<Mutex<Option<FormSnapshotJson>>>,
+    vault_store: Arc<Mutex<Box<dyn VaultStore>>>,
+) {
     thread::spawn(move || {
         let server = match Server::http("127.0.0.1:17373") {
             Ok(s) => s,
@@ -284,7 +287,7 @@ fn start_http_server(snapshot_store: Arc<Mutex<Option<FormSnapshotJson>>>) {
                 Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap(),
                 Header::from_bytes(
                     &b"Access-Control-Allow-Methods"[..],
-                    &b"GET, POST, OPTIONS"[..],
+                    &b"GET, POST, DELETE, OPTIONS"[..],
                 )
                 .unwrap(),
                 Header::from_bytes(
@@ -389,6 +392,114 @@ fn start_http_server(snapshot_store: Arc<Mutex<Option<FormSnapshotJson>>>) {
                 continue;
             }
 
+            // Route: GET /v1/vault (list all vault items)
+            if method == "GET" && url == "/v1/vault" {
+                let json_response = match vault_store.lock() {
+                    Ok(vault) => match vault.list() {
+                        Ok(items) => {
+                            let json_items: Vec<VaultItemJson> =
+                                items.into_iter().map(VaultItemJson::from).collect();
+                            serde_json::to_string(&json_items).unwrap_or_else(|_| "[]".to_string())
+                        }
+                        Err(_) => "[]".to_string(),
+                    },
+                    Err(_) => "[]".to_string(),
+                };
+                let mut response = Response::from_string(json_response);
+                response.add_header(
+                    Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                        .unwrap(),
+                );
+                for header in cors_headers {
+                    response.add_header(header);
+                }
+                let _ = request.respond(response);
+                continue;
+            }
+
+            // Route: POST /v1/vault (add a vault item)
+            if method == "POST" && url == "/v1/vault" {
+                let mut body = String::new();
+                if let Err(e) = request.as_reader().read_to_string(&mut body) {
+                    eprintln!("[Asterisk HTTP] Failed to read body: {}", e);
+                    let mut response = Response::from_string("Bad Request").with_status_code(400);
+                    for header in cors_headers {
+                        response.add_header(header);
+                    }
+                    let _ = request.respond(response);
+                    continue;
+                }
+
+                match serde_json::from_str::<VaultItemJson>(&body) {
+                    Ok(item_json) => {
+                        let key = item_json.key.clone();
+                        match VaultItem::try_from(item_json) {
+                            Ok(vault_item) => {
+                                if let Ok(mut vault) = vault_store.lock() {
+                                    let _ = vault.set(key, vault_item);
+                                }
+                                let mut response = Response::from_string(r#"{"status":"ok"}"#);
+                                response.add_header(
+                                    Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                                        .unwrap(),
+                                );
+                                for header in cors_headers {
+                                    response.add_header(header);
+                                }
+                                let _ = request.respond(response);
+                            }
+                            Err(e) => {
+                                let mut response =
+                                    Response::from_string(format!(r#"{{"error":"{}"}}"#, e))
+                                        .with_status_code(400);
+                                response.add_header(
+                                    Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                                        .unwrap(),
+                                );
+                                for header in cors_headers {
+                                    response.add_header(header);
+                                }
+                                let _ = request.respond(response);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let mut response =
+                            Response::from_string(format!(r#"{{"error":"{}"}}"#, e))
+                                .with_status_code(400);
+                        response.add_header(
+                            Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                                .unwrap(),
+                        );
+                        for header in cors_headers {
+                            response.add_header(header);
+                        }
+                        let _ = request.respond(response);
+                    }
+                }
+                continue;
+            }
+
+            // Route: DELETE /v1/vault?key=xxx (delete a vault item)
+            if method == "DELETE" && url.starts_with("/v1/vault?key=") {
+                let key = url.strip_prefix("/v1/vault?key=").unwrap_or("");
+                let key = urlencoding::decode(key).unwrap_or_default().to_string();
+
+                if let Ok(mut vault) = vault_store.lock() {
+                    let _ = vault.delete(&key);
+                }
+                let mut response = Response::from_string(r#"{"status":"ok"}"#);
+                response.add_header(
+                    Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                        .unwrap(),
+                );
+                for header in cors_headers {
+                    response.add_header(header);
+                }
+                let _ = request.respond(response);
+                continue;
+            }
+
             // 404 for unknown routes
             let mut response = Response::from_string("Not Found").with_status_code(404);
             for header in cors_headers {
@@ -406,18 +517,19 @@ fn start_http_server(snapshot_store: Arc<Mutex<Option<FormSnapshotJson>>>) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize vault store (in-memory for now)
-    let vault_store: Box<dyn VaultStore> = Box::new(InMemoryStore::new());
+    let vault_store: Arc<Mutex<Box<dyn VaultStore>>> =
+        Arc::new(Mutex::new(Box::new(InMemoryStore::new())));
 
     // Initialize form snapshot store (separate from vault)
     let snapshot_store: Arc<Mutex<Option<FormSnapshotJson>>> = Arc::new(Mutex::new(None));
 
     // Start HTTP server for extension bridge
-    start_http_server(Arc::clone(&snapshot_store));
+    start_http_server(Arc::clone(&snapshot_store), Arc::clone(&vault_store));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(AppState {
-            vault: Mutex::new(vault_store),
+            vault: Arc::clone(&vault_store),
         })
         .manage(FormSnapshotState {
             latest: snapshot_store,
