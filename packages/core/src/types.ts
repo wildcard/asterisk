@@ -244,6 +244,11 @@ export interface FormSnapshot {
 // ============================================================================
 
 /**
+ * How a match was determined
+ */
+export type MatchTier = 'autocomplete' | 'pattern' | 'llm';
+
+/**
  * A recommendation for filling a specific field
  */
 export interface FillRecommendation {
@@ -261,17 +266,26 @@ export interface FillRecommendation {
 
   /** Whether this field is required by the form */
   required: boolean;
+
+  /** How the match was determined */
+  matchTier: MatchTier;
 }
 
 /**
  * A complete plan for filling a form
  */
 export interface FillPlan {
+  /** Form fingerprint hash for identification */
+  formFingerprint: string;
+
   /** Which form this plan is for */
   formId: string;
 
   /** Recommendations for each field */
   recommendations: FillRecommendation[];
+
+  /** Field IDs that could not be matched to vault items */
+  unmatchedFields: string[];
 
   /** Overall confidence in the plan (0.0 to 1.0) */
   overallConfidence: number;
@@ -318,3 +332,112 @@ export interface ValidationWarning {
   message: string;
   severity: 'warning';
 }
+
+// ============================================================================
+// Matching - Autocomplete mappings and patterns
+// ============================================================================
+
+/**
+ * Vault category type alias
+ */
+export type VaultCategory = 'identity' | 'contact' | 'address' | 'financial' | 'custom';
+
+/**
+ * Mapping from HTML autocomplete values to vault data
+ * See: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#autofilling-form-controls:-the-autocomplete-attribute
+ */
+export interface AutocompleteMapping {
+  /** Which vault category this maps to */
+  category: VaultCategory;
+  /** Optional: pattern to match in vault item key */
+  keyPattern?: string;
+  /** Confidence when matched via autocomplete */
+  confidence: number;
+}
+
+/**
+ * Standard HTML autocomplete attribute mappings
+ * These provide high-confidence matches (0.95)
+ */
+export const AUTOCOMPLETE_MAPPINGS: Record<string, AutocompleteMapping> = {
+  // Identity
+  'given-name': { category: 'identity', keyPattern: 'firstName', confidence: 0.95 },
+  'family-name': { category: 'identity', keyPattern: 'lastName', confidence: 0.95 },
+  'name': { category: 'identity', keyPattern: 'name', confidence: 0.90 },
+  'honorific-prefix': { category: 'identity', keyPattern: 'prefix', confidence: 0.95 },
+  'honorific-suffix': { category: 'identity', keyPattern: 'suffix', confidence: 0.95 },
+  'nickname': { category: 'identity', keyPattern: 'nickname', confidence: 0.95 },
+  'bday': { category: 'identity', keyPattern: 'birthday', confidence: 0.95 },
+  'sex': { category: 'identity', keyPattern: 'gender', confidence: 0.95 },
+
+  // Contact
+  'email': { category: 'contact', keyPattern: 'email', confidence: 0.95 },
+  'tel': { category: 'contact', keyPattern: 'phone', confidence: 0.95 },
+  'tel-national': { category: 'contact', keyPattern: 'phone', confidence: 0.95 },
+  'url': { category: 'contact', keyPattern: 'website', confidence: 0.90 },
+
+  // Address
+  'street-address': { category: 'address', keyPattern: 'street', confidence: 0.95 },
+  'address-line1': { category: 'address', keyPattern: 'address1', confidence: 0.95 },
+  'address-line2': { category: 'address', keyPattern: 'address2', confidence: 0.95 },
+  'address-level1': { category: 'address', keyPattern: 'state', confidence: 0.95 },
+  'address-level2': { category: 'address', keyPattern: 'city', confidence: 0.95 },
+  'postal-code': { category: 'address', keyPattern: 'zip', confidence: 0.95 },
+  'country': { category: 'address', keyPattern: 'country', confidence: 0.95 },
+  'country-name': { category: 'address', keyPattern: 'country', confidence: 0.95 },
+
+  // Financial
+  'cc-name': { category: 'financial', keyPattern: 'cardName', confidence: 0.95 },
+  'cc-number': { category: 'financial', keyPattern: 'cardNumber', confidence: 0.95 },
+  'cc-exp': { category: 'financial', keyPattern: 'cardExpiry', confidence: 0.95 },
+  'cc-exp-month': { category: 'financial', keyPattern: 'expiryMonth', confidence: 0.95 },
+  'cc-exp-year': { category: 'financial', keyPattern: 'expiryYear', confidence: 0.95 },
+  'cc-csc': { category: 'financial', keyPattern: 'cvv', confidence: 0.95 },
+  'cc-type': { category: 'financial', keyPattern: 'cardType', confidence: 0.95 },
+
+  // Organization
+  'organization': { category: 'identity', keyPattern: 'company', confidence: 0.90 },
+  'organization-title': { category: 'identity', keyPattern: 'jobTitle', confidence: 0.90 },
+};
+
+/**
+ * Pattern-based matching rules for Tier 2 matching
+ * Used when autocomplete attribute is not present
+ */
+export interface PatternRule {
+  /** Patterns to match in field label/name (case-insensitive) */
+  labelPatterns: string[];
+  /** HTML input type to match (optional) */
+  inputType?: FieldType;
+  /** Which vault category this maps to */
+  category: VaultCategory;
+  /** Pattern to find in vault item key */
+  keyPattern: string;
+  /** Confidence when matched via pattern */
+  confidence: number;
+}
+
+/**
+ * Pattern rules for Tier 2 matching
+ */
+export const PATTERN_RULES: PatternRule[] = [
+  // Identity
+  { labelPatterns: ['first name', 'firstname', 'given name'], category: 'identity', keyPattern: 'firstName', confidence: 0.85 },
+  { labelPatterns: ['last name', 'lastname', 'family name', 'surname'], category: 'identity', keyPattern: 'lastName', confidence: 0.85 },
+  { labelPatterns: ['full name', 'your name'], category: 'identity', keyPattern: 'name', confidence: 0.80 },
+
+  // Contact
+  { labelPatterns: ['email', 'e-mail'], inputType: 'email', category: 'contact', keyPattern: 'email', confidence: 0.90 },
+  { labelPatterns: ['phone', 'mobile', 'cell', 'telephone'], inputType: 'tel', category: 'contact', keyPattern: 'phone', confidence: 0.85 },
+
+  // Address
+  { labelPatterns: ['street', 'address line'], category: 'address', keyPattern: 'street', confidence: 0.80 },
+  { labelPatterns: ['city', 'town'], category: 'address', keyPattern: 'city', confidence: 0.85 },
+  { labelPatterns: ['state', 'province', 'region'], category: 'address', keyPattern: 'state', confidence: 0.85 },
+  { labelPatterns: ['zip', 'postal', 'postcode'], category: 'address', keyPattern: 'zip', confidence: 0.85 },
+  { labelPatterns: ['country'], category: 'address', keyPattern: 'country', confidence: 0.85 },
+
+  // Organization
+  { labelPatterns: ['company', 'organization', 'employer'], category: 'identity', keyPattern: 'company', confidence: 0.80 },
+  { labelPatterns: ['job title', 'position', 'role'], category: 'identity', keyPattern: 'jobTitle', confidence: 0.80 },
+];

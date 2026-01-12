@@ -11,6 +11,7 @@ export type {
   Provenance,
   // Vault
   VaultItem,
+  VaultCategory,
   // Form Analysis
   FormBrief,
   FieldNode,
@@ -21,10 +22,26 @@ export type {
   FormFingerprint,
   FormSnapshot,
   // Fill Planning
+  MatchTier,
   FillRecommendation,
   FillPlan,
+  // Matching
+  AutocompleteMapping,
+  PatternRule,
   // Validation
   ValidationResult,
   ValidationError,
   ValidationWarning,
 } from './types';
+
+// Export matching constants
+export { AUTOCOMPLETE_MAPPINGS, PATTERN_RULES } from './types';
+
+// Export matching functions
+export {
+  matchByAutocomplete,
+  matchByPattern,
+  generateFillPlan,
+  getMatchTierDescription,
+  getConfidenceLevel,
+} from './matching';
