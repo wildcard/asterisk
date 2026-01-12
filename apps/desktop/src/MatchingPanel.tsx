@@ -12,9 +12,35 @@ import type {
   FillRecommendation,
   FieldNode,
 } from '@asterisk/core';
+import { matchByLLM, isLLMMatchingAvailable } from './llm-matching';
+import type { LLMMatchingOptions } from './llm-matching';
 
 // Check if we're running in Tauri context
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+// ============================================================================
+// Settings
+// ============================================================================
+
+interface Settings {
+  apiKey: string;
+  useLlmMatching: boolean;
+  llmModel: string;
+}
+
+const SETTINGS_KEY = 'asterisk_settings';
+
+function loadSettings(): Settings {
+  try {
+    const stored = localStorage.getItem(SETTINGS_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.warn('Failed to load settings:', e);
+  }
+  return { apiKey: '', useLlmMatching: false, llmModel: 'claude-sonnet-4-20250514' };
+}
 
 // ============================================================================
 // Types
@@ -113,7 +139,9 @@ export function MatchingPanel() {
   const [vaultItems, setVaultItems] = useState<VaultItemJson[]>([]);
   const [fillPlan, setFillPlan] = useState<FillPlan | null>(null);
   const [loading, setLoading] = useState(false);
+  const [llmLoading, setLlmLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings>(loadSettings);
 
   // Load form snapshot
   const loadSnapshot = useCallback(async () => {
@@ -193,6 +221,84 @@ export function MatchingPanel() {
       setLoading(false);
     }
   }, [loadSnapshot, loadVaultItems]);
+
+  // Run LLM analysis on unmatched fields
+  const runLLMAnalysis = useCallback(async () => {
+    if (!fillPlan || !snapshot || fillPlan.unmatchedFields.length === 0) return;
+    if (!isLLMMatchingAvailable(settings.apiKey)) {
+      setError('Please configure your Claude API key in Settings to use AI matching.');
+      return;
+    }
+
+    setLlmLoading(true);
+    setError(null);
+
+    try {
+      // Get the unmatched fields from the snapshot
+      const formSnapshot = toFormSnapshot(snapshot);
+      const unmatchedFieldNodes = formSnapshot.fields.filter(
+        f => fillPlan.unmatchedFields.includes(f.id)
+      );
+
+      if (unmatchedFieldNodes.length === 0) return;
+
+      // Call LLM matching
+      const llmOptions: LLMMatchingOptions = {
+        apiKey: settings.apiKey,
+        model: settings.llmModel,
+      };
+
+      const items = toVaultItems(vaultItems);
+      const llmRecommendations = await matchByLLM(unmatchedFieldNodes, items, llmOptions);
+
+      if (llmRecommendations.length > 0) {
+        // Merge LLM recommendations into existing fill plan
+        const newRecommendations = [...fillPlan.recommendations, ...llmRecommendations];
+        const newUnmatchedFields = fillPlan.unmatchedFields.filter(
+          id => !llmRecommendations.some(r => r.fieldId === id)
+        );
+
+        // Recalculate statistics
+        const requiredFieldsCovered = formSnapshot.fields.filter(
+          f => f.required && newRecommendations.some(r => r.fieldId === f.id)
+        ).length;
+
+        const overallConfidence =
+          newRecommendations.length > 0
+            ? newRecommendations.reduce((sum, r) => sum + r.confidence, 0) /
+              newRecommendations.length
+            : 0;
+
+        setFillPlan({
+          ...fillPlan,
+          recommendations: newRecommendations,
+          unmatchedFields: newUnmatchedFields,
+          requiredFieldsCovered,
+          overallConfidence,
+          warnings: newUnmatchedFields.length > 0
+            ? [`${newUnmatchedFields.length} field(s) still unmatched after AI analysis`]
+            : undefined,
+        });
+      } else {
+        setError('AI analysis could not find additional matches.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLlmLoading(false);
+    }
+  }, [fillPlan, snapshot, vaultItems, settings]);
+
+  // Reload settings when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        setSettings(loadSettings());
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -319,7 +425,17 @@ export function MatchingPanel() {
           {/* Unmatched Fields */}
           {fillPlan.unmatchedFields.length > 0 && (
             <div className="unmatched-section">
-              <h3>Unmatched Fields</h3>
+              <div className="unmatched-header">
+                <h3>Unmatched Fields ({fillPlan.unmatchedFields.length})</h3>
+                <button
+                  onClick={runLLMAnalysis}
+                  disabled={llmLoading || !isLLMMatchingAvailable(settings.apiKey)}
+                  className="llm-btn"
+                  title={!isLLMMatchingAvailable(settings.apiKey) ? 'Configure API key in Settings' : 'Analyze with Claude AI'}
+                >
+                  {llmLoading ? 'Analyzing...' : 'Analyze with AI'}
+                </button>
+              </div>
               <div className="unmatched-list">
                 {fillPlan.unmatchedFields.map(fieldId => {
                   const field = getField(fieldId);
@@ -332,9 +448,11 @@ export function MatchingPanel() {
                   );
                 })}
               </div>
-              <p className="unmatched-hint">
-                Add matching data to your vault or enable LLM matching for better results.
-              </p>
+              {!isLLMMatchingAvailable(settings.apiKey) && (
+                <p className="unmatched-hint">
+                  Configure your Claude API key in Settings to enable AI-powered matching.
+                </p>
+              )}
             </div>
           )}
         </div>

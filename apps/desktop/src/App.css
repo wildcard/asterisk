@@ -691,8 +691,43 @@ button:disabled {
   margin-top: 1.5rem;
 }
 
+.unmatched-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.unmatched-header h3 {
+  margin: 0;
+}
+
+.llm-btn {
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
+.llm-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+}
+
+.llm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .recommendations-section h3,
-.unmatched-section h3 {
+.unmatched-section > h3 {
   margin: 0 0 1rem;
   font-size: 1.1rem;
   color: #333;
@@ -863,6 +898,15 @@ button:disabled {
   .recommendations-section h3,
   .unmatched-section h3 {
     color: #e0e0e0;
+  }
+
+  .llm-btn {
+    background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+    box-shadow: 0 2px 4px rgba(90, 111, 214, 0.4);
+  }
+
+  .llm-btn:hover:not(:disabled) {
+    box-shadow: 0 4px 8px rgba(90, 111, 214, 0.5);
   }
 
   .recommendation-row,
