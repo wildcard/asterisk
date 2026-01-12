@@ -21,6 +21,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 asterisk-vault = { path = "../../../crates/vault" }
 chrono = { version = "0.4", features = ["serde"] }
+# HTTP server for extension bridge
+tiny_http = "0.12"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-cli = "2"
