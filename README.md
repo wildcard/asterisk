@@ -1,5 +1,8 @@
 # Asterisk
 
+[![CI](https://github.com/wildcard/asterisk/actions/workflows/ci.yml/badge.svg)](https://github.com/wildcard/asterisk/actions/workflows/ci.yml)
+[![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
+
 **Grammarly for forms** - An intelligent form-filling assistant that helps you complete web forms accurately and efficiently.
 
 ## Overview
