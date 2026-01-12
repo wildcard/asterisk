@@ -1,0 +1,41 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+target
+.turbo
+.next
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Tauri
+apps/desktop/src-tauri/target
+apps/desktop/src-tauri/WixTools
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.tsbuildinfo
