@@ -304,6 +304,47 @@ export interface FillPlan {
 }
 
 // ============================================================================
+// Fill Commands - Desktop → Extension communication
+// ============================================================================
+
+/**
+ * A single field fill instruction
+ */
+export interface FieldFill {
+  /** The field ID to fill (matches FieldNode.id) */
+  fieldId: string;
+
+  /** The value to fill into the field */
+  value: string;
+}
+
+/**
+ * Command sent from desktop to extension to fill a form
+ *
+ * SECURITY: Values are resolved from vault at send time.
+ * The extension receives ready-to-fill values, not vault keys.
+ */
+export interface FillCommand {
+  /** Unique command ID for deduplication */
+  id: string;
+
+  /** Domain to match (e.g., 'github.com') */
+  targetDomain: string;
+
+  /** URL pattern to match (optional, for more specific targeting) */
+  targetUrl?: string;
+
+  /** Fields to fill with their values */
+  fills: FieldFill[];
+
+  /** When the command was created */
+  createdAt: string;
+
+  /** Command expires after this time (ISO 8601) */
+  expiresAt: string;
+}
+
+// ============================================================================
 // Validation Results
 // ============================================================================
 

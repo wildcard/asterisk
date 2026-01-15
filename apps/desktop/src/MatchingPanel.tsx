@@ -11,6 +11,8 @@ import type {
   FillPlan,
   FillRecommendation,
   FieldNode,
+  FillCommand,
+  FieldFill,
 } from '@asterisk/core';
 import { matchByLLM, isLLMMatchingAvailable } from './llm-matching';
 import type { LLMMatchingOptions } from './llm-matching';
@@ -140,7 +142,9 @@ export function MatchingPanel() {
   const [fillPlan, setFillPlan] = useState<FillPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [llmLoading, setLlmLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(loadSettings);
 
   // Load form snapshot
@@ -289,6 +293,65 @@ export function MatchingPanel() {
     }
   }, [fillPlan, snapshot, vaultItems, settings]);
 
+  // Apply fill plan - send fill command to extension
+  const applyFillPlan = useCallback(async () => {
+    if (!fillPlan || !snapshot || fillPlan.recommendations.length === 0) return;
+
+    setApplying(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Convert recommendations to fills with actual values
+      const fills: FieldFill[] = fillPlan.recommendations
+        .map(rec => {
+          const vaultItem = vaultItems.find(v => v.key === rec.vaultKey);
+          if (!vaultItem) return null;
+          return {
+            fieldId: rec.fieldId,
+            value: vaultItem.value,
+          };
+        })
+        .filter((f): f is FieldFill => f !== null);
+
+      if (fills.length === 0) {
+        setError('No values to fill - vault items not found');
+        return;
+      }
+
+      // Create fill command
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
+
+      const command: FillCommand = {
+        id: `fill-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        targetDomain: snapshot.domain,
+        targetUrl: snapshot.url,
+        fills,
+        createdAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+      };
+
+      // Send to backend
+      const response = await fetch('http://127.0.0.1:17373/v1/fill-commands', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(command),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to send fill command: ${response.statusText}`);
+      }
+
+      setSuccess(`Fill command sent! ${fills.length} field(s) ready to fill on ${snapshot.domain}`);
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setApplying(false);
+    }
+  }, [fillPlan, snapshot, vaultItems]);
+
   // Reload settings when tab becomes visible
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -330,12 +393,25 @@ export function MatchingPanel() {
     <div className="matching-panel">
       <div className="matching-header">
         <h2>Form Matching</h2>
-        <button onClick={generatePlan} disabled={loading} className="generate-btn">
-          {loading ? 'Generating...' : 'Generate Fill Plan'}
-        </button>
+        <div className="header-buttons">
+          <button onClick={generatePlan} disabled={loading} className="generate-btn">
+            {loading ? 'Generating...' : 'Generate Fill Plan'}
+          </button>
+          {fillPlan && fillPlan.recommendations.length > 0 && (
+            <button
+              onClick={applyFillPlan}
+              disabled={applying}
+              className="apply-btn"
+              title="Send fill command to Chrome extension"
+            >
+              {applying ? 'Sending...' : 'Apply Fill Plan'}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <div className="error">{error}</div>}
+      {success && <div className="success">{success}</div>}
 
       {/* Summary Section */}
       <div className="matching-summary">

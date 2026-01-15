@@ -5,7 +5,7 @@
  * WITHOUT capturing any user-entered values.
  */
 
-import type { FieldNode, FieldType, FormFingerprint, FormSnapshot, SelectOption } from '@asterisk/core';
+import type { FieldNode, FieldType, FormFingerprint, FormSnapshot, SelectOption, FillCommand } from '@asterisk/core';
 
 // ============================================================================
 // Constants
@@ -13,6 +13,7 @@ import type { FieldNode, FieldType, FormFingerprint, FormSnapshot, SelectOption 
 
 const DEBOUNCE_MS = 500;
 const DESKTOP_BRIDGE_MESSAGE = 'ASTERISK_FORM_SNAPSHOT';
+const FILL_COMMAND_MESSAGE = 'ASTERISK_FILL_COMMAND';
 
 // ============================================================================
 // Type Guards and Helpers
@@ -416,6 +417,170 @@ function setupEventListeners(): void {
     subtree: true,
   });
 }
+
+// ============================================================================
+// Fill Command Handling
+// ============================================================================
+
+/**
+ * Find a form field element by its ID
+ * Handles both standard IDs and our generated field-X IDs
+ */
+function findFieldElement(fieldId: string): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null {
+  // First try to find by exact ID
+  let element = document.getElementById(fieldId);
+  if (element && isFormField(element)) {
+    return element;
+  }
+
+  // If the fieldId is our generated format (field-X), find by index
+  const match = fieldId.match(/^field-(\d+)$/);
+  if (match) {
+    const index = parseInt(match[1], 10);
+    const allFields = document.querySelectorAll('input, select, textarea');
+    let visibleIndex = 0;
+
+    for (const el of allFields) {
+      if (!isFormField(el)) continue;
+
+      // Skip hidden and button-like inputs
+      if (isInputElement(el)) {
+        const type = el.type.toLowerCase();
+        if (type === 'hidden' || type === 'submit' || type === 'button' || type === 'reset' || type === 'image') {
+          continue;
+        }
+      }
+
+      if (visibleIndex === index) {
+        return el;
+      }
+      visibleIndex++;
+    }
+  }
+
+  // Try to find by name attribute
+  element = document.querySelector(`[name="${fieldId}"]`);
+  if (element && isFormField(element)) {
+    return element;
+  }
+
+  return null;
+}
+
+/**
+ * Fill a single form field with a value
+ */
+function fillField(element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string): boolean {
+  try {
+    if (isSelectElement(element)) {
+      // Find matching option
+      for (const option of element.options) {
+        if (option.value === value || option.textContent?.trim() === value) {
+          element.value = option.value;
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if (isInputElement(element)) {
+      const type = element.type.toLowerCase();
+
+      if (type === 'checkbox') {
+        element.checked = value === 'true' || value === '1' || value === 'on';
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }
+
+      if (type === 'radio') {
+        // For radio buttons, find the one with matching value
+        const name = element.name;
+        const radio = document.querySelector(`input[type="radio"][name="${name}"][value="${value}"]`) as HTMLInputElement;
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }
+        return false;
+      }
+    }
+
+    // Text-like inputs and textareas
+    element.value = value;
+
+    // Dispatch events to trigger any listeners
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // For React/Vue controlled inputs, also dispatch a native input event
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
+      'value'
+    )?.set;
+
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(element, value);
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    return true;
+  } catch (e) {
+    console.error('[Asterisk] Failed to fill field:', e);
+    return false;
+  }
+}
+
+/**
+ * Execute a fill command from the desktop app
+ */
+function executeFillCommand(command: FillCommand): { success: boolean; filledCount: number } {
+  let filledCount = 0;
+
+  for (const fill of command.fills) {
+    const element = findFieldElement(fill.fieldId);
+
+    if (!element) {
+      console.debug('[Asterisk] Field not found:', fill.fieldId);
+      continue;
+    }
+
+    if (fillField(element, fill.value)) {
+      filledCount++;
+      console.debug('[Asterisk] Filled field:', fill.fieldId);
+    }
+  }
+
+  return {
+    success: filledCount > 0,
+    filledCount,
+  };
+}
+
+// ============================================================================
+// Fill Command Message Listener
+// ============================================================================
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === FILL_COMMAND_MESSAGE && message.payload) {
+    const command = message.payload as FillCommand;
+
+    // Verify domain matches
+    const currentDomain = window.location.hostname;
+    if (command.targetDomain !== currentDomain) {
+      console.debug('[Asterisk] Domain mismatch:', command.targetDomain, 'vs', currentDomain);
+      sendResponse({ success: false, reason: 'domain_mismatch' });
+      return true;
+    }
+
+    const result = executeFillCommand(command);
+    console.log('[Asterisk] Fill command executed:', result.filledCount, 'of', command.fills.length, 'fields filled');
+
+    sendResponse({ success: result.success, filledCount: result.filledCount });
+  }
+
+  return true;
+});
 
 // ============================================================================
 // Initialize

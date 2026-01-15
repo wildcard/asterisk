@@ -21,6 +21,11 @@ pub struct FormSnapshotState {
     pub latest: Arc<Mutex<Option<FormSnapshotJson>>>,
 }
 
+/// State for pending fill commands (desktop → extension)
+pub struct FillCommandState {
+    pub commands: Arc<Mutex<Vec<FillCommandJson>>>,
+}
+
 // ============================================================================
 // Vault Serializable Types for IPC
 // ============================================================================
@@ -108,6 +113,41 @@ pub struct FormSnapshotJson {
     pub captured_at: String,
     pub fingerprint: FormFingerprintJson,
     pub fields: Vec<FieldNodeJson>,
+}
+
+// ============================================================================
+// Fill Command Types (desktop → extension communication)
+// ============================================================================
+
+/// A single field fill instruction
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FieldFillJson {
+    /// The field ID to fill (matches FieldNode.id)
+    #[serde(rename = "fieldId")]
+    pub field_id: String,
+    /// The value to fill into the field
+    pub value: String,
+}
+
+/// Command sent from desktop to extension to fill a form
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FillCommandJson {
+    /// Unique command ID for deduplication
+    pub id: String,
+    /// Domain to match (e.g., 'github.com')
+    #[serde(rename = "targetDomain")]
+    pub target_domain: String,
+    /// URL pattern to match (optional)
+    #[serde(rename = "targetUrl", skip_serializing_if = "Option::is_none")]
+    pub target_url: Option<String>,
+    /// Fields to fill with their values
+    pub fills: Vec<FieldFillJson>,
+    /// When the command was created (ISO 8601)
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    /// Command expires after this time (ISO 8601)
+    #[serde(rename = "expiresAt")]
+    pub expires_at: String,
 }
 
 // ============================================================================
@@ -266,6 +306,7 @@ fn get_latest_form_snapshot(
 fn start_http_server(
     snapshot_store: Arc<Mutex<Option<FormSnapshotJson>>>,
     vault_store: Arc<Mutex<Box<dyn VaultStore>>>,
+    fill_command_store: Arc<Mutex<Vec<FillCommandJson>>>,
 ) {
     thread::spawn(move || {
         let server = match Server::http("127.0.0.1:17373") {
@@ -500,6 +541,118 @@ fn start_http_server(
                 continue;
             }
 
+            // Route: POST /v1/fill-commands (desktop sends a fill command)
+            if method == "POST" && url == "/v1/fill-commands" {
+                let mut body = String::new();
+                if let Err(e) = request.as_reader().read_to_string(&mut body) {
+                    eprintln!("[Asterisk HTTP] Failed to read body: {}", e);
+                    let mut response = Response::from_string("Bad Request").with_status_code(400);
+                    for header in cors_headers {
+                        response.add_header(header);
+                    }
+                    let _ = request.respond(response);
+                    continue;
+                }
+
+                match serde_json::from_str::<FillCommandJson>(&body) {
+                    Ok(command) => {
+                        println!(
+                            "[Asterisk HTTP] Received fill command: {} -> {} fields",
+                            command.target_domain,
+                            command.fills.len()
+                        );
+
+                        // Store the command
+                        if let Ok(mut store) = fill_command_store.lock() {
+                            // Remove any existing command with same ID
+                            store.retain(|c| c.id != command.id);
+                            store.push(command);
+                        }
+
+                        let mut response = Response::from_string(r#"{"status":"ok"}"#);
+                        response.add_header(
+                            Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                                .unwrap(),
+                        );
+                        for header in cors_headers {
+                            response.add_header(header);
+                        }
+                        let _ = request.respond(response);
+                    }
+                    Err(e) => {
+                        eprintln!("[Asterisk HTTP] Invalid fill command JSON: {}", e);
+                        let mut response =
+                            Response::from_string(format!(r#"{{"error":"{}"}}"#, e))
+                                .with_status_code(400);
+                        response.add_header(
+                            Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                                .unwrap(),
+                        );
+                        for header in cors_headers {
+                            response.add_header(header);
+                        }
+                        let _ = request.respond(response);
+                    }
+                }
+                continue;
+            }
+
+            // Route: GET /v1/fill-commands?domain=xxx (extension polls for commands)
+            if method == "GET" && url.starts_with("/v1/fill-commands") {
+                let domain = if url.contains("?domain=") {
+                    url.split("?domain=").nth(1).map(|s| {
+                        urlencoding::decode(s).unwrap_or_default().to_string()
+                    })
+                } else {
+                    None
+                };
+
+                let json_response = match fill_command_store.lock() {
+                    Ok(store) => {
+                        // Filter by domain if specified, also filter out expired commands
+                        let now = chrono::Utc::now().to_rfc3339();
+                        let commands: Vec<&FillCommandJson> = store
+                            .iter()
+                            .filter(|c| c.expires_at > now)
+                            .filter(|c| domain.as_ref().map_or(true, |d| &c.target_domain == d))
+                            .collect();
+                        serde_json::to_string(&commands).unwrap_or_else(|_| "[]".to_string())
+                    }
+                    Err(_) => "[]".to_string(),
+                };
+                let mut response = Response::from_string(json_response);
+                response.add_header(
+                    Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                        .unwrap(),
+                );
+                for header in cors_headers {
+                    response.add_header(header);
+                }
+                let _ = request.respond(response);
+                continue;
+            }
+
+            // Route: DELETE /v1/fill-commands?id=xxx (extension acknowledges command completion)
+            if method == "DELETE" && url.starts_with("/v1/fill-commands?id=") {
+                let id = url.strip_prefix("/v1/fill-commands?id=").unwrap_or("");
+                let id = urlencoding::decode(id).unwrap_or_default().to_string();
+
+                if let Ok(mut store) = fill_command_store.lock() {
+                    store.retain(|c| c.id != id);
+                }
+                println!("[Asterisk HTTP] Fill command completed: {}", id);
+                let mut response = Response::from_string(r#"{"status":"ok"}"#);
+                response.add_header(
+                    Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                        .unwrap(),
+                );
+                for header in cors_headers {
+                    response.add_header(header);
+                }
+                let _ = request.respond(response);
+                continue;
+            }
+
             // 404 for unknown routes
             let mut response = Response::from_string("Not Found").with_status_code(404);
             for header in cors_headers {
@@ -523,8 +676,15 @@ pub fn run() {
     // Initialize form snapshot store (separate from vault)
     let snapshot_store: Arc<Mutex<Option<FormSnapshotJson>>> = Arc::new(Mutex::new(None));
 
+    // Initialize fill command store (desktop → extension)
+    let fill_command_store: Arc<Mutex<Vec<FillCommandJson>>> = Arc::new(Mutex::new(Vec::new()));
+
     // Start HTTP server for extension bridge
-    start_http_server(Arc::clone(&snapshot_store), Arc::clone(&vault_store));
+    start_http_server(
+        Arc::clone(&snapshot_store),
+        Arc::clone(&vault_store),
+        Arc::clone(&fill_command_store),
+    );
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -533,6 +693,9 @@ pub fn run() {
         })
         .manage(FormSnapshotState {
             latest: snapshot_store,
+        })
+        .manage(FillCommandState {
+            commands: fill_command_store,
         })
         .invoke_handler(tauri::generate_handler![
             vault_set,

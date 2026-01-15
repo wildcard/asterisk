@@ -5,14 +5,17 @@
  * to the desktop app via localhost HTTP.
  */
 
-import type { FormSnapshot } from '@asterisk/core';
+import type { FormSnapshot, FillCommand } from '@asterisk/core';
 
 // ============================================================================
 // Constants
 // ============================================================================
 
 const DESKTOP_API_URL = 'http://127.0.0.1:17373/v1/form-snapshots';
+const FILL_COMMANDS_URL = 'http://127.0.0.1:17373/v1/fill-commands';
 const DESKTOP_BRIDGE_MESSAGE = 'ASTERISK_FORM_SNAPSHOT';
+const FILL_COMMAND_MESSAGE = 'ASTERISK_FILL_COMMAND';
+const FILL_POLL_INTERVAL = 2000; // Poll every 2 seconds
 
 // Track connection status to avoid spamming
 let lastConnectionAttempt = 0;
@@ -74,6 +77,102 @@ async function checkDesktopHealth(): Promise<boolean> {
 }
 
 // ============================================================================
+// Fill Command Polling
+// ============================================================================
+
+// Track processed commands to avoid duplicates
+const processedCommands = new Set<string>();
+
+async function pollFillCommands(): Promise<void> {
+  if (!isDesktopAvailable) return;
+
+  try {
+    const response = await fetch(FILL_COMMANDS_URL, {
+      method: 'GET',
+    });
+
+    if (!response.ok) return;
+
+    const commands: FillCommand[] = await response.json();
+
+    for (const command of commands) {
+      // Skip already processed commands
+      if (processedCommands.has(command.id)) continue;
+
+      // Check if command is expired
+      if (new Date(command.expiresAt) < new Date()) {
+        processedCommands.add(command.id);
+        await acknowledgeFillCommand(command.id);
+        continue;
+      }
+
+      // Try to send to matching tab
+      const success = await sendFillCommandToTab(command);
+
+      if (success) {
+        processedCommands.add(command.id);
+        await acknowledgeFillCommand(command.id);
+        console.debug('[Asterisk] Fill command executed:', command.id, command.fills.length, 'fields');
+      }
+    }
+  } catch {
+    // Silently fail - desktop may not be running
+  }
+}
+
+async function sendFillCommandToTab(command: FillCommand): Promise<boolean> {
+  // Find tabs matching the target domain
+  const tabs = await chrome.tabs.query({ url: `*://${command.targetDomain}/*` });
+
+  if (tabs.length === 0) {
+    console.debug('[Asterisk] No tabs found for domain:', command.targetDomain);
+    return false;
+  }
+
+  // Try to send to the first matching tab
+  for (const tab of tabs) {
+    if (!tab.id) continue;
+
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: FILL_COMMAND_MESSAGE,
+        payload: command,
+      });
+
+      if (response?.success) {
+        return true;
+      }
+    } catch {
+      // Tab may not have content script loaded, try next tab
+      continue;
+    }
+  }
+
+  return false;
+}
+
+async function acknowledgeFillCommand(commandId: string): Promise<void> {
+  try {
+    await fetch(`${FILL_COMMANDS_URL}?id=${encodeURIComponent(commandId)}`, {
+      method: 'DELETE',
+    });
+  } catch {
+    // Silently fail
+  }
+}
+
+// Start polling
+let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+function startFillCommandPolling(): void {
+  if (pollInterval) return;
+
+  pollInterval = setInterval(pollFillCommands, FILL_POLL_INTERVAL);
+  // Also poll immediately
+  pollFillCommands();
+}
+
+// ============================================================================
 // Message Handling
 // ============================================================================
 
@@ -101,17 +200,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // ============================================================================
 
 // Check desktop health on install/update
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
   console.log('[Asterisk] Extension installed/updated');
-  checkDesktopHealth();
+  const available = await checkDesktopHealth();
+  if (available) {
+    startFillCommandPolling();
+  }
 });
 
 // Periodic health check (every 30 seconds when extension is active)
-setInterval(() => {
-  if (!isDesktopAvailable) {
-    checkDesktopHealth();
+setInterval(async () => {
+  const wasAvailable = isDesktopAvailable;
+  await checkDesktopHealth();
+
+  // Start polling when desktop becomes available
+  if (!wasAvailable && isDesktopAvailable) {
+    startFillCommandPolling();
   }
 }, 30000);
+
+// Start polling on service worker startup
+checkDesktopHealth().then((available) => {
+  if (available) {
+    startFillCommandPolling();
+  }
+});
 
 // Log startup
 console.log('[Asterisk] Background service worker started');

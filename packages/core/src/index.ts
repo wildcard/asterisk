@@ -25,6 +25,9 @@ export type {
   MatchTier,
   FillRecommendation,
   FillPlan,
+  // Fill Commands (desktop → extension)
+  FieldFill,
+  FillCommand,
   // Matching
   AutocompleteMapping,
   PatternRule,
