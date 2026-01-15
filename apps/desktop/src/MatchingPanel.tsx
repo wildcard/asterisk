@@ -39,7 +39,7 @@ function loadSettings(): Settings {
   } catch (e) {
     console.warn('Failed to load settings:', e);
   }
-  return { apiKey: '', useLlmMatching: false, llmModel: 'claude-sonnet-4-20250514' };
+  return { apiKey: '', useLlmMatching: false, llmModel: 'claude-sonnet-4-5-20250929' };
 }
 
 // ============================================================================

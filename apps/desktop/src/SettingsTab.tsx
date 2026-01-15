@@ -16,7 +16,7 @@ interface Settings {
 const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
   useLlmMatching: false,
-  llmModel: 'claude-sonnet-4-20250514',
+  llmModel: 'claude-sonnet-4-5-20250929',
 };
 
 const STORAGE_KEY = 'asterisk_settings';
@@ -141,6 +141,7 @@ export function SettingsTab() {
           'Content-Type': 'application/json',
           'x-api-key': settings.apiKey,
           'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
           model: settings.llmModel,
@@ -218,9 +219,9 @@ export function SettingsTab() {
             onChange={(e) => setSettings({ ...settings, llmModel: e.target.value })}
             disabled={saving}
           >
-            <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Recommended)</option>
-            <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Faster)</option>
-            <option value="claude-opus-4-20250514">Claude Opus 4 (Most capable)</option>
+            <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (Recommended)</option>
+            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (Faster)</option>
+            <option value="claude-opus-4-5-20251101">Claude Opus 4.5 (Most capable)</option>
           </select>
         </div>
 
