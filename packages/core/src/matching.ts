@@ -31,17 +31,30 @@ function findVaultItemByPattern(
   category: VaultCategory,
   keyPattern?: string
 ): VaultItem | undefined {
-  // First try exact key pattern match within category
+  // If keyPattern is specified, we MUST match it - no fallback to generic category
   if (keyPattern) {
+    // Try exact key pattern match within category
     const exactMatch = vaultItems.find(
       item =>
         item.category === category &&
         item.key.toLowerCase().includes(keyPattern.toLowerCase())
     );
     if (exactMatch) return exactMatch;
+
+    // Also check label for pattern match (some users may have "Personal Email" key but label contains the pattern)
+    const labelMatch = vaultItems.find(
+      item =>
+        item.category === category &&
+        item.label.toLowerCase().includes(keyPattern.toLowerCase())
+    );
+    if (labelMatch) return labelMatch;
+
+    // If keyPattern was specified but nothing matched, return undefined
+    // This prevents incorrect matches (e.g., phone field matching firstName)
+    return undefined;
   }
 
-  // Fallback to category match
+  // Only fallback to category match when no keyPattern was specified
   return vaultItems.find(item => item.category === category);
 }
 
