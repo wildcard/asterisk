@@ -101,15 +101,54 @@ pnpm build
 - [Data Separation Design](./docs/data-separation.md)
 - [Threat Model](./docs/threat-model.md)
 
+## Features
+
+### Trust & UX (PR1)
+- **Review & Apply Dialog**: Review all form fills before applying with confidence-based disposition
+  - Safe (≥98% confidence): Auto-approved matches
+  - Review (90-98%): User confirmation recommended
+  - Blocked (<90%): Requires explicit user selection
+- **Undo Functionality**: Toast notification with undo button to revert fills
+- **Audit Log**: Append-only JSONL audit trail with:
+  - Per-field match confidence and disposition
+  - Redacted old/new values (PII protection)
+  - User confirmation tracking
+  - Expandable audit entries with full field details
+- **Fill Plan Analysis**: Multi-tier matching strategy
+  - Tier 1: Autocomplete attribute matching (95% confidence)
+  - Tier 2: Pattern-based matching (label, name, id)
+  - Tier 3: LLM-powered matching for ambiguous fields
+
+### Chrome Extension Bridge
+- HTTP server (port 17373) for desktop ↔ extension communication
+- Form snapshot capture and analysis
+- Fill command execution via extension
+- Real-time form detection
+
+### Vault Management
+- CRUD operations for personal data items
+- Provenance tracking (source, timestamp, confidence)
+- Category-based organization (identity, contact, address, financial, custom)
+- Usage statistics and metadata
+
 ## Current Status
 
-**Phase 1: Foundation** (Current)
+**Phase 2: Trust & UX** (Completed)
 - ✅ Monorepo scaffold
 - ✅ TypeScript type definitions
-- ✅ Rust vault crate (in-memory)
+- ✅ Rust vault crate (in-memory storage)
 - ✅ Tauri desktop app with vault UI
-- 🚧 Form detection (not yet implemented)
-- 🚧 AI-powered analysis (not yet implemented)
+- ✅ Chrome extension with form detection
+- ✅ Form-to-vault matching with tiered strategy
+- ✅ Fill plan review dialog with confidence gating
+- ✅ Audit logging with PII redaction
+- ✅ Undo functionality
+
+**Next Phase: Enhancement**
+- 🚧 LLM-powered matching for unmatched fields
+- 🚧 Vault item creation from form fills
+- 🚧 Encrypted vault storage
+- 🚧 Data export/import
 
 ## License
 
