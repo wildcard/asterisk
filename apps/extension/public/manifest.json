@@ -4,7 +4,9 @@
   "description": "Detects forms and sends structure to Asterisk desktop app",
   "version": "0.1.0",
   "permissions": [
-    "storage"
+    "storage",
+    "alarms",
+    "tabs"
   ],
   "host_permissions": [
     "http://127.0.0.1/*",

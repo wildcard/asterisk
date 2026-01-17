@@ -15,7 +15,10 @@ const DESKTOP_API_URL = 'http://127.0.0.1:17373/v1/form-snapshots';
 const FILL_COMMANDS_URL = 'http://127.0.0.1:17373/v1/fill-commands';
 const DESKTOP_BRIDGE_MESSAGE = 'ASTERISK_FORM_SNAPSHOT';
 const FILL_COMMAND_MESSAGE = 'ASTERISK_FILL_COMMAND';
-const FILL_POLL_INTERVAL = 2000; // Poll every 2 seconds
+// Chrome Alarms API has 1-minute minimum, so we use that for persistent polling
+const HEALTH_CHECK_ALARM = 'asterisk-health-check';
+const FILL_POLL_ALARM = 'asterisk-fill-poll';
+const ALARM_PERIOD_MINUTES = 1; // Minimum supported by Chrome Alarms API
 
 // Track connection status to avoid spamming
 let lastConnectionAttempt = 0;
@@ -161,15 +164,26 @@ async function acknowledgeFillCommand(commandId: string): Promise<void> {
   }
 }
 
-// Start polling
-let pollInterval: ReturnType<typeof setInterval> | null = null;
+// Start polling using Chrome Alarms API (survives service worker restarts)
+async function startFillCommandPolling(): Promise<void> {
+  // Create recurring alarm for fill command polling
+  await chrome.alarms.create(FILL_POLL_ALARM, {
+    periodInMinutes: ALARM_PERIOD_MINUTES,
+    delayInMinutes: 0, // Fire immediately first time
+  });
 
-function startFillCommandPolling(): void {
-  if (pollInterval) return;
-
-  pollInterval = setInterval(pollFillCommands, FILL_POLL_INTERVAL);
-  // Also poll immediately
+  // Also poll immediately on startup
   pollFillCommands();
+  console.log('[Asterisk] Fill command polling started via alarms');
+}
+
+async function startHealthCheckAlarm(): Promise<void> {
+  // Create recurring alarm for health checks
+  await chrome.alarms.create(HEALTH_CHECK_ALARM, {
+    periodInMinutes: ALARM_PERIOD_MINUTES,
+    delayInMinutes: 0,
+  });
+  console.log('[Asterisk] Health check alarm started');
 }
 
 // ============================================================================
@@ -184,6 +198,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendToDesktop(snapshot).then((success) => {
       if (success) {
         console.debug('[Asterisk] Sent form snapshot:', snapshot.domain, snapshot.fingerprint.fieldCount, 'fields');
+        // Piggyback: also poll for fill commands when we receive a form snapshot
+        // This gives us faster response when a form is active
+        pollFillCommands();
       }
     });
 
@@ -196,35 +213,67 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 // ============================================================================
+// Alarm Handling (survives service worker restarts)
+// ============================================================================
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  console.debug('[Asterisk] Alarm fired:', alarm.name);
+
+  if (alarm.name === HEALTH_CHECK_ALARM) {
+    const wasAvailable = isDesktopAvailable;
+    await checkDesktopHealth();
+
+    // Start fill polling when desktop becomes available
+    if (!wasAvailable && isDesktopAvailable) {
+      await startFillCommandPolling();
+    }
+  }
+
+  if (alarm.name === FILL_POLL_ALARM) {
+    if (isDesktopAvailable) {
+      await pollFillCommands();
+    }
+  }
+});
+
+// ============================================================================
 // Extension Lifecycle
 // ============================================================================
 
-// Check desktop health on install/update
+// Check desktop health on install/update and set up alarms
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('[Asterisk] Extension installed/updated');
+
+  // Set up recurring alarms (survive service worker restarts)
+  await startHealthCheckAlarm();
+
   const available = await checkDesktopHealth();
   if (available) {
-    startFillCommandPolling();
+    await startFillCommandPolling();
   }
 });
 
-// Periodic health check (every 30 seconds when extension is active)
-setInterval(async () => {
-  const wasAvailable = isDesktopAvailable;
-  await checkDesktopHealth();
+// Service worker startup - ensure alarms are set up
+// This runs every time the service worker wakes up
+(async () => {
+  console.log('[Asterisk] Background service worker started');
 
-  // Start polling when desktop becomes available
-  if (!wasAvailable && isDesktopAvailable) {
-    startFillCommandPolling();
+  // Check if alarms already exist (they persist across restarts)
+  const existingAlarms = await chrome.alarms.getAll();
+  const hasHealthAlarm = existingAlarms.some((a) => a.name === HEALTH_CHECK_ALARM);
+  const hasFillAlarm = existingAlarms.some((a) => a.name === FILL_POLL_ALARM);
+
+  // Ensure health check alarm exists
+  if (!hasHealthAlarm) {
+    await startHealthCheckAlarm();
   }
-}, 30000);
 
-// Start polling on service worker startup
-checkDesktopHealth().then((available) => {
-  if (available) {
-    startFillCommandPolling();
+  // Check desktop availability and start fill polling if needed
+  const available = await checkDesktopHealth();
+  if (available && !hasFillAlarm) {
+    await startFillCommandPolling();
+  } else if (available) {
+    // Poll immediately on startup even if alarm exists
+    pollFillCommands();
   }
-});
-
-// Log startup
-console.log('[Asterisk] Background service worker started');
+})();
