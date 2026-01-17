@@ -15,7 +15,6 @@ import type {
   FieldFill,
 } from '@asterisk/core';
 import { matchByLLM, isLLMMatchingAvailable } from './llm-matching';
-import type { LLMMatchingOptions } from './llm-matching';
 import {
   FillPlanReviewDialog,
   type FieldInfo,
