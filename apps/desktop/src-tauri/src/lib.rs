@@ -529,6 +529,32 @@ fn audit_get(id: String, state: State<AuditState>) -> Result<Option<AuditEntryJs
     Ok(None)
 }
 
+/// Clear all audit log entries (deletes the file)
+#[tauri::command]
+fn audit_clear(state: State<AuditState>) -> Result<(), String> {
+    match fs::remove_file(&state.log_path) {
+        Ok(_) => {
+            println!("[Asterisk Audit] Audit log cleared");
+            Ok(())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // File doesn't exist, that's fine
+            Ok(())
+        }
+        Err(e) => Err(format!("Failed to clear audit log: {}", e)),
+    }
+}
+
+/// Get the file path of the audit log
+#[tauri::command]
+fn audit_path(state: State<AuditState>) -> Result<String, String> {
+    state
+        .log_path
+        .to_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Invalid audit path".to_string())
+}
+
 // ============================================================================
 // HTTP Server for Extension Bridge
 // ============================================================================
@@ -945,6 +971,8 @@ pub fn run() {
             audit_append,
             audit_list,
             audit_get,
+            audit_clear,
+            audit_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
