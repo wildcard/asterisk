@@ -13,8 +13,8 @@
     "@asterisk/core": "workspace:*"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.268",
+    "@types/chrome": "^0.1.33",
     "typescript": "^5.7.2",
-    "vite": "^6.0.3"
+    "vite": "^7.3.1"
   }
 }
