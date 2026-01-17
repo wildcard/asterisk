@@ -159,6 +159,83 @@ export function matchByPattern(
 }
 
 // ============================================================================
+// Tier 3: LLM-based Matching
+// ============================================================================
+
+/**
+ * Field context for LLM analysis
+ */
+export interface FieldContext {
+  label: string;
+  name: string;
+  type: string;
+  placeholder?: string;
+  semantic?: string;
+}
+
+/**
+ * LLM matcher interface - implemented by desktop app
+ */
+export interface LLMMatcher {
+  analyzeField(field: FieldContext, availableKeys: string[]): Promise<{
+    vaultKey: string | null;
+    confidence: number;
+    reasoning: string;
+  }>;
+}
+
+/**
+ * Match a field using LLM semantic analysis (Tier 3)
+ *
+ * This is an async function that requires an LLM matcher to be provided.
+ * The actual LLM integration is handled by the desktop app to keep API
+ * keys secure and separate from the core matching logic.
+ *
+ * @param field - The field to match
+ * @param vaultItems - Available vault items
+ * @param llmMatcher - LLM integration implementation
+ * @returns FillRecommendation if matched, undefined otherwise
+ */
+export async function matchByLLM(
+  field: FieldNode,
+  vaultItems: VaultItem[],
+  llmMatcher: LLMMatcher
+): Promise<FillRecommendation | undefined> {
+  try {
+    const fieldContext: FieldContext = {
+      label: field.label,
+      name: field.name,
+      type: field.type,
+      placeholder: field.placeholder,
+      semantic: field.semantic,
+    };
+
+    const availableKeys = vaultItems.map(item => item.key);
+    const result = await llmMatcher.analyzeField(fieldContext, availableKeys);
+
+    if (!result.vaultKey) {
+      return undefined;
+    }
+
+    // Ensure confidence is capped at 0.90 for LLM matches
+    // to indicate they're less certain than autocomplete/pattern matches
+    const confidence = Math.min(result.confidence, 0.90);
+
+    return {
+      fieldId: field.id,
+      vaultKey: result.vaultKey,
+      confidence,
+      reason: result.reasoning,
+      required: field.required,
+      matchTier: 'llm' as MatchTier,
+    };
+  } catch (error) {
+    console.error('LLM matching failed:', error);
+    return undefined;
+  }
+}
+
+// ============================================================================
 // Fill Plan Generation
 // ============================================================================
 

@@ -1,3 +1,5 @@
+mod llm;
+
 use asterisk_vault::{
     InMemoryStore, Provenance, ProvenanceSource, VaultCategory, VaultItem, VaultStore,
 };
@@ -32,6 +34,11 @@ pub struct FillCommandState {
 /// State for audit log storage
 pub struct AuditState {
     pub log_path: PathBuf,
+}
+
+/// State for API key storage (in-memory for now, should use keychain in future)
+pub struct ApiKeyState {
+    pub claude_api_key: Arc<Mutex<Option<String>>>,
 }
 
 // ============================================================================
@@ -556,6 +563,66 @@ fn audit_path(state: State<AuditState>) -> Result<String, String> {
 }
 
 // ============================================================================
+// LLM Integration Commands
+// ============================================================================
+
+/// Analyze a field using LLM (Claude API)
+#[tauri::command]
+async fn llm_analyze_field(
+    request: llm::AnalyzeFieldRequest,
+    api_key_state: State<'_, ApiKeyState>,
+) -> Result<llm::AnalyzeFieldResponse, String> {
+    // Get API key from state
+    let api_key = api_key_state
+        .claude_api_key
+        .lock()
+        .map_err(|e| format!("Failed to lock API key: {}", e))?
+        .clone()
+        .ok_or_else(|| "No API key configured. Please set your Claude API key in Settings.".to_string())?;
+
+    // Call LLM analysis
+    llm::analyze_field_with_llm(request, &api_key).await
+}
+
+/// Set the Claude API key
+#[tauri::command]
+fn set_api_key(
+    api_key: String,
+    state: State<ApiKeyState>,
+) -> Result<(), String> {
+    let mut key_store = state
+        .claude_api_key
+        .lock()
+        .map_err(|e| format!("Failed to lock API key: {}", e))?;
+
+    *key_store = Some(api_key);
+    Ok(())
+}
+
+/// Check if API key is configured
+#[tauri::command]
+fn has_api_key(state: State<ApiKeyState>) -> Result<bool, String> {
+    let key_store = state
+        .claude_api_key
+        .lock()
+        .map_err(|e| format!("Failed to lock API key: {}", e))?;
+
+    Ok(key_store.is_some())
+}
+
+/// Clear the API key
+#[tauri::command]
+fn clear_api_key(state: State<ApiKeyState>) -> Result<(), String> {
+    let mut key_store = state
+        .claude_api_key
+        .lock()
+        .map_err(|e| format!("Failed to lock API key: {}", e))?;
+
+    *key_store = None;
+    Ok(())
+}
+
+// ============================================================================
 // HTTP Server for Extension Bridge
 // ============================================================================
 
@@ -962,6 +1029,9 @@ pub fn run() {
         .manage(AuditState {
             log_path: audit_log_path,
         })
+        .manage(ApiKeyState {
+            claude_api_key: Arc::new(Mutex::new(None)),
+        })
         .invoke_handler(tauri::generate_handler![
             vault_set,
             vault_get,
@@ -973,6 +1043,10 @@ pub fn run() {
             audit_get,
             audit_clear,
             audit_path,
+            llm_analyze_field,
+            set_api_key,
+            has_api_key,
+            clear_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
