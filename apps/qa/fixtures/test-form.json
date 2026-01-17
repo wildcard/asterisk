@@ -1,0 +1,46 @@
+{
+  "url": "https://example.com/contact",
+  "title": "Contact Form - Example.com",
+  "fields": [
+    {
+      "id": "field_1",
+      "name": "org",
+      "label": "Your Organization",
+      "type": "text",
+      "placeholder": "Company name",
+      "required": false,
+      "autocomplete": null,
+      "semantic": null
+    },
+    {
+      "id": "field_2",
+      "name": "position",
+      "label": "Your Position",
+      "type": "text",
+      "placeholder": "Job title",
+      "required": false,
+      "autocomplete": null,
+      "semantic": null
+    },
+    {
+      "id": "field_3",
+      "name": "contact_pref",
+      "label": "Best way to reach you",
+      "type": "text",
+      "placeholder": "Phone or email",
+      "required": false,
+      "autocomplete": null,
+      "semantic": null
+    },
+    {
+      "id": "field_4",
+      "name": "email_address",
+      "label": "Email Address",
+      "type": "email",
+      "placeholder": "you@example.com",
+      "required": true,
+      "autocomplete": "email",
+      "semantic": null
+    }
+  ]
+}

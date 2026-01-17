@@ -1,0 +1,50 @@
+[
+  {
+    "id": "vault-1",
+    "key": "company",
+    "value": "Acme Corp",
+    "label": "Company Name",
+    "category": "identity",
+    "provenance": "manual",
+    "metadata": {
+      "created": "2026-01-17T00:00:00Z",
+      "modified": "2026-01-17T00:00:00Z"
+    }
+  },
+  {
+    "id": "vault-2",
+    "key": "jobTitle",
+    "value": "Senior Engineer",
+    "label": "Job Title",
+    "category": "identity",
+    "provenance": "manual",
+    "metadata": {
+      "created": "2026-01-17T00:00:00Z",
+      "modified": "2026-01-17T00:00:00Z"
+    }
+  },
+  {
+    "id": "vault-3",
+    "key": "phone",
+    "value": "+1-555-0123",
+    "label": "Phone Number",
+    "category": "contact",
+    "provenance": "manual",
+    "metadata": {
+      "created": "2026-01-17T00:00:00Z",
+      "modified": "2026-01-17T00:00:00Z"
+    }
+  },
+  {
+    "id": "vault-4",
+    "key": "email",
+    "value": "john@example.com",
+    "label": "Email Address",
+    "category": "contact",
+    "provenance": "manual",
+    "metadata": {
+      "created": "2026-01-17T00:00:00Z",
+      "modified": "2026-01-17T00:00:00Z"
+    }
+  }
+]
