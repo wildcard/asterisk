@@ -24,6 +24,8 @@ chrono = { version = "0.4", features = ["serde"] }
 # HTTP server for extension bridge
 tiny_http = "0.12"
 urlencoding = "2.1"
+# System directory paths
+dirs = "5"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-cli = "2"

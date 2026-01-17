@@ -2,6 +2,9 @@ use asterisk_vault::{
     InMemoryStore, Provenance, ProvenanceSource, VaultCategory, VaultItem, VaultStore,
 };
 use serde::{Deserialize, Serialize};
+use std::fs::{self, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::State;
@@ -24,6 +27,11 @@ pub struct FormSnapshotState {
 /// State for pending fill commands (desktop → extension)
 pub struct FillCommandState {
     pub commands: Arc<Mutex<Vec<FillCommandJson>>>,
+}
+
+/// State for audit log storage
+pub struct AuditState {
+    pub log_path: PathBuf,
 }
 
 // ============================================================================
@@ -148,6 +156,109 @@ pub struct FillCommandJson {
     /// Command expires after this time (ISO 8601)
     #[serde(rename = "expiresAt")]
     pub expires_at: String,
+}
+
+// ============================================================================
+// Audit Log Types (mirrors TypeScript audit.ts)
+// ============================================================================
+
+/// Redaction level applied to a value in the audit log
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RedactionLevel {
+    None,
+    Partial,
+    Masked,
+}
+
+/// Disposition category for a fill recommendation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Disposition {
+    Safe,
+    Review,
+    Blocked,
+}
+
+/// A single field in an audit entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditItemJson {
+    /// The DOM element ID of the field
+    #[serde(rename = "fieldId")]
+    pub field_id: String,
+    /// Human-readable label for the field
+    pub label: String,
+    /// Field type (text, email, tel, etc.)
+    pub kind: String,
+    /// Confidence score for the match (0-1)
+    pub confidence: f64,
+    /// Disposition category based on confidence
+    pub disposition: Disposition,
+    /// Whether this field was actually applied
+    pub applied: bool,
+    /// The vault key that provided the value
+    pub source: String,
+    /// Redacted version of the old (original) value
+    #[serde(rename = "oldValueRedacted")]
+    pub old_value_redacted: String,
+    /// Redacted version of the new (filled) value
+    #[serde(rename = "newValueRedacted")]
+    pub new_value_redacted: String,
+    /// Level of redaction applied
+    pub redaction: RedactionLevel,
+    /// Whether user explicitly confirmed this field
+    #[serde(rename = "userConfirmed")]
+    pub user_confirmed: bool,
+    /// Optional notes (e.g., "undo", "user override")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+}
+
+/// Summary statistics for an audit entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditSummaryJson {
+    /// Total fields in the fill plan
+    #[serde(rename = "plannedCount")]
+    pub planned_count: u32,
+    /// Fields that were actually applied
+    #[serde(rename = "appliedCount")]
+    pub applied_count: u32,
+    /// Fields that were blocked (low confidence)
+    #[serde(rename = "blockedCount")]
+    pub blocked_count: u32,
+    /// Fields that required user review
+    #[serde(rename = "reviewedCount")]
+    pub reviewed_count: u32,
+}
+
+/// A single audit log entry representing one fill operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditEntryJson {
+    /// Unique identifier (UUID)
+    pub id: String,
+    /// ISO timestamp when the operation occurred
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    /// Full URL where the form was filled
+    pub url: String,
+    /// Domain of the form
+    pub domain: String,
+    /// Form fingerprint hash for identification
+    pub fingerprint: String,
+    /// Summary statistics
+    pub summary: AuditSummaryJson,
+    /// Individual field items
+    pub items: Vec<AuditItemJson>,
+}
+
+/// Response from audit_list command with pagination support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditListResponse {
+    /// List of audit entries
+    pub items: Vec<AuditEntryJson>,
+    /// Cursor for next page, if more entries exist
+    #[serde(rename = "nextCursor", skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<u32>,
 }
 
 // ============================================================================
@@ -297,6 +408,125 @@ fn get_latest_form_snapshot(
 ) -> Result<Option<FormSnapshotJson>, String> {
     let latest = state.latest.lock().map_err(|e| e.to_string())?;
     Ok(latest.clone())
+}
+
+// ============================================================================
+// Tauri Commands - Audit Log
+// ============================================================================
+
+/// Append a new audit entry to the log file
+#[tauri::command]
+fn audit_append(entry: AuditEntryJson, state: State<AuditState>) -> Result<(), String> {
+    // Ensure parent directory exists
+    if let Some(parent) = state.log_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create audit directory: {}", e))?;
+    }
+
+    // Serialize to JSON line
+    let json_line =
+        serde_json::to_string(&entry).map_err(|e| format!("Failed to serialize entry: {}", e))?;
+
+    // Append to file
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&state.log_path)
+        .map_err(|e| format!("Failed to open audit log: {}", e))?;
+
+    writeln!(file, "{}", json_line).map_err(|e| format!("Failed to write audit entry: {}", e))?;
+
+    println!(
+        "[Asterisk Audit] Logged entry {} for {}",
+        entry.id, entry.domain
+    );
+    Ok(())
+}
+
+/// List audit entries with optional pagination
+#[tauri::command]
+fn audit_list(
+    limit: Option<u32>,
+    cursor: Option<u32>,
+    state: State<AuditState>,
+) -> Result<AuditListResponse, String> {
+    let limit = limit.unwrap_or(50).min(100) as usize;
+    let start = cursor.unwrap_or(0) as usize;
+
+    // Read all entries from file
+    let file = match fs::File::open(&state.log_path) {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // No audit log yet, return empty
+            return Ok(AuditListResponse {
+                items: vec![],
+                next_cursor: None,
+            });
+        }
+        Err(e) => return Err(format!("Failed to open audit log: {}", e)),
+    };
+
+    let reader = BufReader::new(file);
+    let mut entries: Vec<AuditEntryJson> = Vec::new();
+
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("Failed to read line: {}", e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<AuditEntryJson>(&line) {
+            Ok(entry) => entries.push(entry),
+            Err(e) => {
+                eprintln!("[Asterisk Audit] Skipping malformed entry: {}", e);
+                continue;
+            }
+        }
+    }
+
+    // Sort by createdAt descending (newest first)
+    entries.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Apply pagination
+    let total = entries.len();
+    let page: Vec<AuditEntryJson> = entries.into_iter().skip(start).take(limit).collect();
+
+    let next_cursor = if start + page.len() < total {
+        Some((start + page.len()) as u32)
+    } else {
+        None
+    };
+
+    Ok(AuditListResponse {
+        items: page,
+        next_cursor,
+    })
+}
+
+/// Get a single audit entry by ID
+#[tauri::command]
+fn audit_get(id: String, state: State<AuditState>) -> Result<Option<AuditEntryJson>, String> {
+    let file = match fs::File::open(&state.log_path) {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(None);
+        }
+        Err(e) => return Err(format!("Failed to open audit log: {}", e)),
+    };
+
+    let reader = BufReader::new(file);
+
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("Failed to read line: {}", e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Ok(entry) = serde_json::from_str::<AuditEntryJson>(&line) {
+            if entry.id == id {
+                return Ok(Some(entry));
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 // ============================================================================
@@ -679,6 +909,12 @@ pub fn run() {
     // Initialize fill command store (desktop → extension)
     let fill_command_store: Arc<Mutex<Vec<FillCommandJson>>> = Arc::new(Mutex::new(Vec::new()));
 
+    // Initialize audit log path (in app data directory)
+    let audit_log_path = dirs::data_local_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("asterisk")
+        .join("audit.jsonl");
+
     // Start HTTP server for extension bridge
     start_http_server(
         Arc::clone(&snapshot_store),
@@ -697,12 +933,18 @@ pub fn run() {
         .manage(FillCommandState {
             commands: fill_command_store,
         })
+        .manage(AuditState {
+            log_path: audit_log_path,
+        })
         .invoke_handler(tauri::generate_handler![
             vault_set,
             vault_get,
             vault_list,
             vault_delete,
             get_latest_form_snapshot,
+            audit_append,
+            audit_list,
+            audit_get,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

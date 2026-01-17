@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   generateFillPlan,
@@ -16,6 +16,12 @@ import type {
 } from '@asterisk/core';
 import { matchByLLM, isLLMMatchingAvailable } from './llm-matching';
 import type { LLMMatchingOptions } from './llm-matching';
+import {
+  FillPlanReviewDialog,
+  type FieldInfo,
+  type VaultItemInfo,
+} from './components/fillplan';
+import type { LastAppliedOperation, AuditEntry } from './types/audit';
 
 // Check if we're running in Tauri context
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -146,6 +152,36 @@ export function MatchingPanel() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(loadSettings);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [lastApplied, setLastApplied] = useState<LastAppliedOperation | null>(null);
+
+  // Build field info map for review dialog
+  const fieldInfoMap = useMemo(() => {
+    const map = new Map<string, FieldInfo>();
+    if (snapshot) {
+      for (const field of snapshot.fields) {
+        map.set(field.id, {
+          id: field.id,
+          label: field.label || field.name || field.id,
+          type: field.type,
+        });
+      }
+    }
+    return map;
+  }, [snapshot]);
+
+  // Build vault item info map for review dialog
+  const vaultItemMap = useMemo(() => {
+    const map = new Map<string, VaultItemInfo>();
+    for (const item of vaultItems) {
+      map.set(item.key, {
+        key: item.key,
+        value: item.value,
+        label: item.label,
+      });
+    }
+    return map;
+  }, [vaultItems]);
 
   // Load form snapshot
   const loadSnapshot = useCallback(async () => {
@@ -293,17 +329,35 @@ export function MatchingPanel() {
     }
   }, [fillPlan, snapshot, vaultItems, settings]);
 
-  // Apply fill plan - send fill command to extension
-  const applyFillPlan = useCallback(async () => {
-    if (!fillPlan || !snapshot || fillPlan.recommendations.length === 0) return;
+  // Open review dialog
+  const openReviewDialog = useCallback(() => {
+    if (!fillPlan || fillPlan.recommendations.length === 0) return;
+    setIsReviewOpen(true);
+  }, [fillPlan]);
+
+  // Capture old values from DOM (placeholder - actual capture happens in extension)
+  const captureOldValues = useCallback(async (): Promise<Map<string, string>> => {
+    // In a real implementation, this would query the extension for current field values
+    // For now, return empty map (old values will show as "(empty)")
+    return new Map<string, string>();
+  }, []);
+
+  // Apply selected fills from review dialog
+  const handleApply = useCallback(async (selectedFieldIds: string[], auditEntry: AuditEntry) => {
+    if (!fillPlan || !snapshot) return;
 
     setApplying(true);
     setError(null);
     setSuccess(null);
 
     try {
+      // Get recommendations for selected fields only
+      const selectedRecs = fillPlan.recommendations.filter(
+        rec => selectedFieldIds.includes(rec.fieldId)
+      );
+
       // Convert recommendations to fills with actual values
-      const fills: FieldFill[] = fillPlan.recommendations
+      const fills: FieldFill[] = selectedRecs
         .map(rec => {
           const vaultItem = vaultItems.find(v => v.key === rec.vaultKey);
           if (!vaultItem) return null;
@@ -343,6 +397,33 @@ export function MatchingPanel() {
         throw new Error(`Failed to send fill command: ${response.statusText}`);
       }
 
+      // Track for undo support
+      const oldValues: Record<string, string> = {};
+      const newValues: Record<string, string> = {};
+      for (const fill of fills) {
+        oldValues[fill.fieldId] = ''; // Would come from captureOldValues
+        newValues[fill.fieldId] = fill.value;
+      }
+
+      setLastApplied({
+        entryId: auditEntry.id,
+        domain: snapshot.domain,
+        oldValues,
+        newValues,
+        appliedAt: new Date().toISOString(),
+      });
+
+      // Store audit entry to backend
+      if (isTauri) {
+        try {
+          await invoke('audit_append', { entry: auditEntry });
+          console.log('Audit entry stored:', auditEntry.id);
+        } catch (auditErr) {
+          console.warn('Failed to store audit entry:', auditErr);
+          // Non-fatal: don't block fill operation if audit fails
+        }
+      }
+
       setSuccess(`Fill command sent! ${fills.length} field(s) ready to fill on ${snapshot.domain}`);
       setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
@@ -351,6 +432,46 @@ export function MatchingPanel() {
       setApplying(false);
     }
   }, [fillPlan, snapshot, vaultItems]);
+
+  // Undo last applied operation
+  const handleUndo = useCallback(async () => {
+    if (!lastApplied) return;
+
+    try {
+      // Create undo fill command with old values
+      const fills: FieldFill[] = Object.entries(lastApplied.oldValues).map(
+        ([fieldId, value]) => ({ fieldId, value })
+      );
+
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+
+      const command: FillCommand = {
+        id: `undo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        targetDomain: lastApplied.domain,
+        targetUrl: snapshot?.url || '',
+        fills,
+        createdAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+      };
+
+      const response = await fetch('http://127.0.0.1:17373/v1/fill-commands', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(command),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to send undo command: ${response.statusText}`);
+      }
+
+      setLastApplied(null);
+      setSuccess('Undo command sent!');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [lastApplied, snapshot]);
 
   // Reload settings when tab becomes visible
   useEffect(() => {
@@ -399,12 +520,12 @@ export function MatchingPanel() {
           </button>
           {fillPlan && fillPlan.recommendations.length > 0 && (
             <button
-              onClick={applyFillPlan}
+              onClick={openReviewDialog}
               disabled={applying}
               className="apply-btn"
-              title="Send fill command to Chrome extension"
+              title="Review and apply fill recommendations"
             >
-              {applying ? 'Sending...' : 'Apply Fill Plan'}
+              {applying ? 'Sending...' : 'Review & Apply'}
             </button>
           )}
         </div>
@@ -539,6 +660,24 @@ export function MatchingPanel() {
         <div className="empty-state">
           <p>Click "Generate Fill Plan" to analyze the current form and find matches from your vault.</p>
         </div>
+      )}
+
+      {/* Review Dialog */}
+      {fillPlan && snapshot && (
+        <FillPlanReviewDialog
+          isOpen={isReviewOpen}
+          onClose={() => setIsReviewOpen(false)}
+          fillPlan={fillPlan}
+          domain={snapshot.domain}
+          url={snapshot.url}
+          fingerprint={snapshot.fingerprint.hash}
+          fieldInfoMap={fieldInfoMap}
+          vaultItemMap={vaultItemMap}
+          onApply={handleApply}
+          captureOldValues={captureOldValues}
+          lastApplied={lastApplied}
+          onUndo={handleUndo}
+        />
       )}
     </div>
   );
