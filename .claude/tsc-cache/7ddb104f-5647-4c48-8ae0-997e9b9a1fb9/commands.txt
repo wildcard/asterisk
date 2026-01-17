@@ -1,0 +1,2 @@
+packages/core:build:cd /Users/kobik-private/workspace/asterisk/packages/core && npm run build
+packages/core:tsc:cd /Users/kobik-private/workspace/asterisk/packages/core && npx tsc --noEmit

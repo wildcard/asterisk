@@ -1,0 +1,15 @@
+{
+  "enabledPlugins": {
+    "agent-orchestration@claude-code-workflows": true,
+    "systems-programming@claude-code-workflows": true,
+    "cicd-automation@claude-code-workflows": true,
+    "deployment-strategies@claude-code-workflows": true,
+    "deployment-validation@claude-code-workflows": true,
+    "ast-grep@ast-grep-marketplace": true,
+    "tdd-workflows@claude-code-workflows": true,
+    "code-refactoring@claude-code-workflows": true,
+    "huggingface-skills@claude-plugins-official": true,
+    "sdd@context-engineering-kit": true,
+    "beads@beads-marketplace": true
+  }
+}
