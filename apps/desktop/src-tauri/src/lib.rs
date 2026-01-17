@@ -723,6 +723,21 @@ fn start_http_server(
                             snapshot.fields.len()
                         );
 
+                        // Ignore snapshots from desktop app itself (localhost:1420)
+                        if snapshot.url.contains("localhost:1420") || snapshot.url.contains("127.0.0.1:1420") {
+                            println!("[Asterisk HTTP] Ignoring snapshot from desktop app itself");
+                            let mut response = Response::from_string(r#"{"status":"ignored"}"#);
+                            response.add_header(
+                                Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                                    .unwrap(),
+                            );
+                            for header in cors_headers {
+                                response.add_header(header);
+                            }
+                            let _ = request.respond(response);
+                            continue;
+                        }
+
                         // Store the snapshot
                         if let Ok(mut store) = snapshot_store.lock() {
                             *store = Some(snapshot);
