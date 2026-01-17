@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asterisk Advanced Form Test</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    .form-section {
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #eee;
+    }
+    .form-section:last-child {
+      border-bottom: none;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #764ba2;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 15px;
+    }
+    .form-row {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+    .form-group {
+      flex: 1;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #444;
+      font-size: 14px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #764ba2;
+      box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.1);
+    }
+    input.filled {
+      background: #f0fff0;
+      border-color: #4CAF50;
+    }
+    .required::after {
+      content: " *";
+      color: #e53935;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 14px 32px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(118, 75, 162, 0.4);
+    }
+    .status-panel {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+    .status-panel h3 {
+      margin: 0 0 15px 0;
+      color: #333;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    #formValues {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .fill-indicator {
+      display: inline-block;
+      padding: 4px 8px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Asterisk Form Fill Test</h1>
+    <p class="subtitle">Advanced test form with autocomplete attributes for testing the fill injection feature.</p>
+
+    <form id="advancedForm">
+      <!-- Personal Information -->
+      <div class="form-section">
+        <div class="section-title">Personal Information</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="firstName" class="required">First Name</label>
+            <input type="text" id="firstName" name="firstName" autocomplete="given-name" required placeholder="John">
+          </div>
+          <div class="form-group">
+            <label for="lastName" class="required">Last Name</label>
+            <input type="text" id="lastName" name="lastName" autocomplete="family-name" required placeholder="Doe">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="email" class="required">Email Address</label>
+            <input type="email" id="email" name="email" autocomplete="email" required placeholder="john@example.com">
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" name="phone" autocomplete="tel" placeholder="+1 (555) 123-4567">
+          </div>
+        </div>
+      </div>
+
+      <!-- Address Information -->
+      <div class="form-section">
+        <div class="section-title">Address</div>
+        <div class="form-group">
+          <label for="street">Street Address</label>
+          <input type="text" id="street" name="street" autocomplete="street-address" placeholder="123 Main Street">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="city">City</label>
+            <input type="text" id="city" name="city" autocomplete="address-level2" placeholder="San Francisco">
+          </div>
+          <div class="form-group">
+            <label for="state">State</label>
+            <input type="text" id="state" name="state" autocomplete="address-level1" placeholder="California">
+          </div>
+          <div class="form-group">
+            <label for="zip">ZIP Code</label>
+            <input type="text" id="zip" name="zip" autocomplete="postal-code" placeholder="94102">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="country">Country</label>
+          <select id="country" name="country" autocomplete="country">
+            <option value="">Select a country...</option>
+            <option value="US">United States</option>
+            <option value="CA">Canada</option>
+            <option value="UK">United Kingdom</option>
+            <option value="DE">Germany</option>
+            <option value="FR">France</option>
+            <option value="AU">Australia</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Professional Information -->
+      <div class="form-section">
+        <div class="section-title">Professional</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="company">Company</label>
+            <input type="text" id="company" name="company" autocomplete="organization" placeholder="Acme Corp">
+          </div>
+          <div class="form-group">
+            <label for="jobTitle">Job Title</label>
+            <input type="text" id="jobTitle" name="jobTitle" autocomplete="organization-title" placeholder="Software Engineer">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="website">Website</label>
+          <input type="url" id="website" name="website" autocomplete="url" placeholder="https://example.com">
+        </div>
+      </div>
+
+      <!-- Additional -->
+      <div class="form-section">
+        <div class="section-title">Additional Information</div>
+        <div class="form-group">
+          <label for="bio">Bio / Notes</label>
+          <textarea id="bio" name="bio" rows="3" placeholder="Tell us about yourself..."></textarea>
+        </div>
+      </div>
+
+      <button type="submit">Submit Form</button>
+    </form>
+
+    <div class="status-panel">
+      <h3>📊 Live Form Values</h3>
+      <pre id="formValues">{ "status": "waiting for input..." }</pre>
+    </div>
+  </div>
+
+  <script>
+    // Track and display form values in real-time
+    function updateFormValues() {
+      const form = document.getElementById('advancedForm');
+      const data = {};
+      const inputs = form.querySelectorAll('input, select, textarea');
+      
+      inputs.forEach(input => {
+        if (input.name) {
+          data[input.name] = input.value || '';
+          
+          // Visual feedback for filled fields
+          if (input.value && input.value.trim() !== '') {
+            input.classList.add('filled');
+          } else {
+            input.classList.remove('filled');
+          }
+        }
+      });
+      
+      document.getElementById('formValues').textContent = JSON.stringify(data, null, 2);
+    }
+
+    // Attach listeners to all form fields
+    document.querySelectorAll('#advancedForm input, #advancedForm select, #advancedForm textarea').forEach(el => {
+      el.addEventListener('input', updateFormValues);
+      el.addEventListener('change', updateFormValues);
+    });
+
+    // Handle form submission
+    document.getElementById('advancedForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      alert('Form submitted! Check the console for form data.');
+      console.log('Form Data:', new FormData(e.target));
+    });
+
+    // Initial update
+    updateFormValues();
+
+    // Log when Asterisk extension fills fields
+    console.log('[Test Page] Ready for Asterisk form fill testing');
+  </script>
+</body>
+</html>
