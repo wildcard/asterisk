@@ -1,0 +1,72 @@
+---
+session: asterisk
+date: 2026-01-16
+status: partial
+outcome: PARTIAL_PLUS
+---
+
+goal: Test PR1 Trust & UX end-to-end in native desktop app
+now: Complete manual testing then run automated tests
+test: cd apps/desktop && pnpm tauri dev
+
+done_this_session:
+  - task: Started native Tauri desktop app successfully
+    files: []
+    details: App running on localhost:1420 with HTTP bridge on port 17373
+  - task: Posted test form to HTTP bridge
+    details: Form snapshot available in desktop app for testing
+
+blockers: []
+
+questions:
+  - "Does the audit log file get created after clicking Apply?"
+  - "Does the toast with Undo button appear?"
+  - "Can you expand audit entries to see field details?"
+  - "Does undo functionality work correctly?"
+
+testing_checklist:
+  manual_testing:
+    - "[ ] Open Match tab - see form 127.0.0.1 with 2 vault items"
+    - "[ ] Click 'Generate Fill Plan' - should show 1 match (Email)"
+    - "[ ] Click 'Review & Apply' - dialog opens with confidence disposition"
+    - "[ ] Verify Email Address field checked, 95% confidence, autocomplete badge"
+    - "[ ] Click 'Apply 1 field' - should send fill command"
+    - "[ ] Toast appears with success message and Undo button"
+    - "[ ] Click Audit tab - see entry for 127.0.0.1"
+    - "[ ] Expand audit entry - see field-level details"
+    - "[ ] Click Undo (if toast still visible) - should revert"
+    - "[ ] Check audit log for undo entry"
+
+  file_verification:
+    - "[ ] Audit file created at ~/Library/Application Support/asterisk/audit.jsonl"
+    - "[ ] Audit file contains valid JSONL entries"
+    - "[ ] Redacted values show partial masking (first 2 + last 2 chars)"
+    - "[ ] Confidence scores and dispositions are correct"
+
+next:
+  - Complete manual testing checklist above
+  - Verify audit.jsonl file was created and contains correct data
+  - Run automated tests (after they're implemented)
+  - Test with real Chrome extension form capture (not just HTTP POST)
+
+context:
+  desktop_app_process: 37256
+  http_bridge: "http://127.0.0.1:17373"
+  vite_dev_server: "http://localhost:1420/"
+  audit_log_path: "~/Library/Application Support/asterisk/audit.jsonl"
+  test_form_posted: true
+  vault_items: 2 (firstName, email)
+
+current_state:
+  - Desktop app is running and ready for testing
+  - Test form has been posted via HTTP
+  - Waiting for manual UI testing to generate audit entries
+  - Undo functionality implemented but not yet tested
+  - Audit screen implemented but no entries to display yet
+
+files_relevant:
+  - apps/desktop/src/MatchingPanel.tsx (apply and undo logic)
+  - apps/desktop/src/AuditTab.tsx (audit log display)
+  - apps/desktop/src/components/fillplan/FillPlanReviewDialog.tsx (review dialog with toast)
+  - apps/desktop/src-tauri/src/lib.rs (audit backend, lines 418-556)
+  - apps/desktop/src/types/audit.ts (audit types and redaction)

@@ -28,11 +28,19 @@ const STORAGE_KEY = 'asterisk_settings';
 async function loadSettings(): Promise<Settings> {
   try {
     if (isTauri) {
-      // In Tauri, use the store plugin or invoke a command
+      // In Tauri, check if API key is set and load other settings from localStorage
       const { invoke } = await import('@tauri-apps/api/core');
       try {
-        const settings = await invoke<Settings | null>('get_settings');
-        return settings || DEFAULT_SETTINGS;
+        const hasApiKey = await invoke<boolean>('has_api_key');
+        const stored = localStorage.getItem(STORAGE_KEY);
+        const localSettings = stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
+
+        // If we have an API key in Tauri state, preserve the placeholder
+        if (hasApiKey && !localSettings.apiKey) {
+          localSettings.apiKey = '••••••••••••••••';
+        }
+
+        return localSettings;
       } catch {
         // Settings command not available yet, fall back to localStorage
         const stored = localStorage.getItem(STORAGE_KEY);
@@ -52,14 +60,20 @@ async function loadSettings(): Promise<Settings> {
 async function saveSettings(settings: Settings): Promise<void> {
   try {
     if (isTauri) {
-      // In Tauri, use the store plugin or invoke a command
+      // In Tauri, save API key via command and other settings via localStorage
       const { invoke } = await import('@tauri-apps/api/core');
-      try {
-        await invoke('set_settings', { settings });
-      } catch {
-        // Settings command not available yet, fall back to localStorage
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+
+      // Save API key to Tauri state if it's not the placeholder
+      if (settings.apiKey && settings.apiKey !== '••••••••••••••••') {
+        await invoke('set_api_key', { apiKey: settings.apiKey });
       }
+
+      // Save other settings to localStorage (excluding actual API key)
+      const settingsToStore = {
+        ...settings,
+        apiKey: '', // Don't store actual API key in localStorage
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToStore));
     } else {
       // In browser, use localStorage
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));

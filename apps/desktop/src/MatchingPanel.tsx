@@ -154,6 +154,7 @@ export function MatchingPanel() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [lastApplied, setLastApplied] = useState<LastAppliedOperation | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   // Build field info map for review dialog
   const fieldInfoMap = useMemo(() => {
@@ -265,7 +266,10 @@ export function MatchingPanel() {
   // Run LLM analysis on unmatched fields
   const runLLMAnalysis = useCallback(async () => {
     if (!fillPlan || !snapshot || fillPlan.unmatchedFields.length === 0) return;
-    if (!isLLMMatchingAvailable(settings.apiKey)) {
+
+    // Check if LLM matching is available
+    const available = await isLLMMatchingAvailable();
+    if (!available) {
       setError('Please configure your Claude API key in Settings to use AI matching.');
       return;
     }
@@ -282,14 +286,21 @@ export function MatchingPanel() {
 
       if (unmatchedFieldNodes.length === 0) return;
 
-      // Call LLM matching
-      const llmOptions: LLMMatchingOptions = {
-        apiKey: settings.apiKey,
-        model: settings.llmModel,
-      };
-
       const items = toVaultItems(vaultItems);
-      const llmRecommendations = await matchByLLM(unmatchedFieldNodes, items, llmOptions);
+
+      // Call LLM matching for each field
+      const llmRecommendations: FillRecommendation[] = [];
+      for (const field of unmatchedFieldNodes) {
+        try {
+          const recommendation = await matchByLLM(field, items);
+          if (recommendation) {
+            llmRecommendations.push(recommendation);
+          }
+        } catch (err) {
+          console.error(`Failed to analyze field ${field.id}:`, err);
+          // Continue with other fields
+        }
+      }
 
       if (llmRecommendations.length > 0) {
         // Merge LLM recommendations into existing fill plan
@@ -473,22 +484,30 @@ export function MatchingPanel() {
     }
   }, [lastApplied, snapshot]);
 
+  // Check API key status
+  const checkApiKeyStatus = useCallback(async () => {
+    const available = await isLLMMatchingAvailable();
+    setHasApiKey(available);
+  }, []);
+
   // Reload settings when tab becomes visible
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         setSettings(loadSettings());
+        checkApiKeyStatus();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+  }, [checkApiKeyStatus]);
 
   // Initial load
   useEffect(() => {
     loadSnapshot();
     loadVaultItems();
-  }, [loadSnapshot, loadVaultItems]);
+    checkApiKeyStatus();
+  }, [loadSnapshot, loadVaultItems, checkApiKeyStatus]);
 
   // Get field by ID from snapshot
   const getField = (fieldId: string): FormSnapshotJson['fields'][0] | undefined => {
@@ -626,9 +645,9 @@ export function MatchingPanel() {
                 <h3>Unmatched Fields ({fillPlan.unmatchedFields.length})</h3>
                 <button
                   onClick={runLLMAnalysis}
-                  disabled={llmLoading || !isLLMMatchingAvailable(settings.apiKey)}
+                  disabled={llmLoading || !hasApiKey}
                   className="llm-btn"
-                  title={!isLLMMatchingAvailable(settings.apiKey) ? 'Configure API key in Settings' : 'Analyze with Claude AI'}
+                  title={!hasApiKey ? 'Configure API key in Settings' : 'Analyze with Claude AI'}
                 >
                   {llmLoading ? 'Analyzing...' : 'Analyze with AI'}
                 </button>
@@ -645,7 +664,7 @@ export function MatchingPanel() {
                   );
                 })}
               </div>
-              {!isLLMMatchingAvailable(settings.apiKey) && (
+              {!hasApiKey && (
                 <p className="unmatched-hint">
                   Configure your Claude API key in Settings to enable AI-powered matching.
                 </p>

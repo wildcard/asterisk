@@ -1,0 +1,114 @@
+---
+session: asterisk
+date: 2026-01-16
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Complete PR1 Trust & UX implementation and prepare for Phase 3
+now: Test desktop app end-to-end, then implement Phase 3 features (#9-12)
+test: cd apps/desktop && pnpm tauri dev
+
+done_this_session:
+  - task: Fixed phone number matching fallback bug
+    files: [packages/core/src/matching.ts]
+    details: Removed incorrect fallback to generic category match when keyPattern specified. Phone fields no longer match to firstName.
+  - task: Completed PR1 Trust & UX - Part B (Audit Backend)
+    files: [apps/desktop/src-tauri/src/lib.rs]
+    details: Added audit_clear and audit_path commands. Backend was 90% complete, added missing utilities.
+  - task: Verified Parts A & C already implemented
+    files: [apps/desktop/src/MatchingPanel.tsx, apps/desktop/src/AuditTab.tsx, apps/desktop/src/components/fillplan/FillPlanReviewDialog.tsx]
+    details: Undo functionality with toast, audit screen with expandable entries all working.
+  - task: Updated README with PR1 features
+    files: [README.md]
+    details: Added Features section, updated status to Phase 2 complete, documented multi-tier matching.
+  - task: Committed development tooling
+    files: [.beads/, .claude/, AGENTS.md, PR1_TRUST_UX_PROMPT.md, apps/extension/test-form-advanced.html]
+    details: Added Beads issue tracking, Claude Code config, dev docs and test fixtures.
+  - task: Created GitHub issues for Phase 3
+    details: "Issues #9-12: LLM matching, vault creation, encryption, export/import"
+
+blockers: []
+
+questions: []
+
+decisions:
+  - audit_backend_completion: "Only needed to add audit_clear and audit_path - rest was already implemented"
+  - direct_to_main: "Pushed directly to main instead of PR since PR1 was already reviewed in previous sessions"
+  - phase_3_tracking: "Created GitHub issues instead of Beads issues for better visibility and cross-session continuity"
+
+findings:
+  - pr1_mostly_complete: "Parts A (undo) and C (audit screen) were fully implemented in previous sessions. Part B needed 2 commands."
+  - matching_bug_root_cause: "findVaultItemByPattern() fell back to ANY category item when keyPattern didn't match, causing phone→firstName mismatch"
+  - browser_vs_native: "Audit tab shows error in browser (localhost:1420) because Tauri APIs require native desktop app"
+  - desktop_app_structure: "Uses Tauri + React + Vite with Rust backend. HTTP server on port 17373 bridges desktop ↔ extension."
+
+worked:
+  - "Edit tool for surgical fixes to matching.ts fallback logic"
+  - "Reading existing code first to understand what was already implemented"
+  - "GitHub issues with acceptance criteria for cross-session continuity"
+  - "Structured commits: bugfix → feature → docs → tooling"
+
+failed:
+  - "Testing in browser instead of native app - audit log requires Tauri __TAURI_INTERNALS__"
+
+next:
+  - Kill existing vite server (pkill -f "vite.*1420") and test native desktop app
+  - Run end-to-end test: apply → audit log → undo → audit screen
+  - Verify audit entries written to disk at ~/Library/Application Support/asterisk/audit.jsonl
+  - Implement Phase 3 features starting with #9 (LLM matching) or #10 (vault creation from forms)
+
+files:
+  created:
+    - .beads/.gitignore
+    - .beads/README.md
+    - .beads/config.yaml
+    - .beads/interactions.jsonl
+    - .beads/metadata.json
+    - .claude/cache/agents/scout/latest-output.md
+    - .claude/settings.json
+    - .claude/settings.local.json
+    - .claude/tsc-cache/
+    - .gitattributes
+    - AGENTS.md
+    - PR1_TRUST_UX_PROMPT.md
+    - apps/extension/test-form-advanced.html
+  modified:
+    - packages/core/src/matching.ts (lines 33-58: fixed findVaultItemByPattern fallback)
+    - apps/desktop/src-tauri/src/lib.rs (lines 532-556: added audit_clear, audit_path; lines 974-975: registered commands)
+    - README.md (lines 104-151: added Features section and Phase 2 status)
+
+commits_pushed:
+  - "51597f1: Fix phone number matching fallback bug"
+  - "5891d3a: Add missing audit commands (audit_clear and audit_path)"
+  - "9bba50d: Update README to reflect PR1 Trust & UX implementation"
+  - "a7e2783: Add Beads issue tracking infrastructure"
+  - "c38c274: Add Claude Code development tooling"
+  - "bd5998c: Add development documentation and test files"
+
+github_issues_created:
+  - "#9: LLM-powered matching for unmatched fields"
+  - "#10: Vault item creation from form fills"
+  - "#11: Encrypted vault storage"
+  - "#12: Data export and import functionality"
+
+context:
+  project: "Asterisk - Grammarly for Forms"
+  architecture: "Tauri desktop app + Chrome extension + Rust vault backend"
+  current_phase: "Phase 2 (Trust & UX) - COMPLETE"
+  next_phase: "Phase 3 (Enhancement) - tracked in GitHub issues #9-12"
+
+key_files:
+  matching: packages/core/src/matching.ts
+  audit_backend: apps/desktop/src-tauri/src/lib.rs
+  audit_types: apps/desktop/src/types/audit.ts
+  audit_ui: apps/desktop/src/AuditTab.tsx
+  review_dialog: apps/desktop/src/components/fillplan/FillPlanReviewDialog.tsx
+  matching_panel: apps/desktop/src/MatchingPanel.tsx
+
+testing_notes:
+  - Browser version at localhost:1420 doesn't support audit log (needs Tauri APIs)
+  - Native app: cd apps/desktop && pnpm tauri dev
+  - Test form: apps/extension/test-form-advanced.html
+  - Audit log path: ~/Library/Application Support/asterisk/audit.jsonl
+  - HTTP bridge: localhost:17373

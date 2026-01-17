@@ -114,50 +114,41 @@ Respond ONLY with the JSON array, no other text.`;
 // ============================================================================
 
 /**
- * Call Claude API to analyze fields
+ * Call Tauri backend to analyze a single field
  */
-async function callClaudeAPI(
-  prompt: string,
-  options: LLMMatchingOptions
-): Promise<FieldAnalysis[]> {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': options.apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: options.model,
-      max_tokens: 1024,
-      messages: [
-        { role: 'user', content: prompt } as ClaudeMessage,
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(`Claude API error: ${error.error?.message || response.statusText}`);
+async function analyzeSingleField(
+  field: FieldNode,
+  vaultItems: VaultItem[]
+): Promise<{ vaultKey: string | null; confidence: number; reasoning: string }> {
+  // Check if running in Tauri
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  if (!isTauri) {
+    throw new Error('LLM matching is only available in the Tauri desktop app');
   }
 
-  const data: ClaudeResponse = await response.json();
-  const text = data.content[0]?.text || '[]';
+  const { invoke } = await import('@tauri-apps/api/core');
 
-  // Parse JSON response
-  try {
-    // Extract JSON array from response (handle markdown code blocks)
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      console.warn('LLM response did not contain JSON array:', text);
-      return [];
-    }
-    return JSON.parse(jsonMatch[0]);
-  } catch (e) {
-    console.warn('Failed to parse LLM response:', text, e);
-    return [];
-  }
+  // Prepare request
+  const request = {
+    label: field.label,
+    name: field.name,
+    type: field.type,
+    placeholder: field.placeholder || null,
+    semantic: field.semantic || null,
+    available_keys: vaultItems.map(item => item.key),
+  };
+
+  // Call Rust backend
+  const response = await invoke<{ vault_key: string | null; confidence: number; reasoning: string }>(
+    'llm_analyze_field',
+    { request }
+  );
+
+  return {
+    vaultKey: response.vault_key,
+    confidence: response.confidence,
+    reasoning: response.reasoning,
+  };
 }
 
 // ============================================================================
@@ -210,47 +201,40 @@ function createRecommendationFromAnalysis(
 }
 
 /**
- * Match multiple fields using LLM analysis (Tier 3)
+ * Match a single field using LLM analysis (Tier 3) via Tauri backend
  *
- * @param fields - Fields to analyze (should be unmatched from Tier 1 & 2)
+ * @param field - Field to analyze (should be unmatched from Tier 1 & 2)
  * @param vaultItems - Available vault items to match against
- * @param options - LLM configuration
- * @returns Array of recommendations for matched fields
+ * @returns Recommendation if matched, undefined otherwise
  */
 export async function matchByLLM(
-  fields: FieldNode[],
-  vaultItems: VaultItem[],
-  options: LLMMatchingOptions
-): Promise<FillRecommendation[]> {
-  if (fields.length === 0) return [];
-  if (vaultItems.length === 0) return [];
-
-  // Limit batch size
-  const maxFields = options.maxFields || 10;
-  const fieldsToAnalyze = fields.slice(0, maxFields);
+  field: FieldNode,
+  vaultItems: VaultItem[]
+): Promise<FillRecommendation | undefined> {
+  if (vaultItems.length === 0) return undefined;
 
   try {
-    const prompt = generateAnalysisPrompt(fieldsToAnalyze);
-    const analyses = await callClaudeAPI(prompt, options);
+    const result = await analyzeSingleField(field, vaultItems);
 
-    const recommendations: FillRecommendation[] = [];
-
-    for (const analysis of analyses) {
-      const field = fieldsToAnalyze.find(f => f.id === analysis.fieldId);
-      if (!field) continue;
-
-      const recommendation = createRecommendationFromAnalysis(
-        analysis,
-        field,
-        vaultItems
-      );
-
-      if (recommendation) {
-        recommendations.push(recommendation);
-      }
+    if (!result.vaultKey) {
+      return undefined;
     }
 
-    return recommendations;
+    // Find the vault item
+    const vaultItem = vaultItems.find(item => item.key === result.vaultKey);
+    if (!vaultItem) {
+      console.warn(`LLM suggested key "${result.vaultKey}" not found in vault`);
+      return undefined;
+    }
+
+    return {
+      fieldId: field.id,
+      vaultKey: vaultItem.key,
+      confidence: result.confidence,
+      reason: result.reasoning,
+      required: field.required,
+      matchTier: 'llm' as MatchTier,
+    };
   } catch (error) {
     console.error('LLM matching failed:', error);
     throw error;
@@ -258,8 +242,21 @@ export async function matchByLLM(
 }
 
 /**
- * Check if LLM matching is available (has valid API key)
+ * Check if LLM matching is available (has API key configured in Tauri backend)
  */
-export function isLLMMatchingAvailable(apiKey: string | undefined): boolean {
-  return Boolean(apiKey && apiKey.startsWith('sk-ant-') && apiKey.length > 20);
+export async function isLLMMatchingAvailable(): Promise<boolean> {
+  try {
+    // Check if running in Tauri
+    const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    if (!isTauri) {
+      return false;
+    }
+
+    const { invoke } = await import('@tauri-apps/api/core');
+    const hasKey = await invoke<boolean>('has_api_key');
+    return hasKey;
+  } catch (error) {
+    console.error('Failed to check API key:', error);
+    return false;
+  }
 }
