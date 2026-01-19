@@ -5,6 +5,20 @@
  * WITHOUT capturing any user-entered values.
  */
 
+// CRITICAL: Log immediately when script loads to verify it's running
+console.log('[Asterisk Content] Script loaded at', new Date().toISOString());
+console.log('[Asterisk Content] Extension ID:', chrome?.runtime?.id || 'UNDEFINED');
+console.log('[Asterisk Content] URL:', window.location.href);
+
+// CRITICAL: Check if we're on the desktop app itself
+// The desktop app (localhost:1420) contains forms in its UI, but we should never try to
+// detect or fill them - that would cause "Extension context invalidated" errors
+const IS_DESKTOP_APP = window.location.hostname === 'localhost' && window.location.port === '1420';
+
+if (IS_DESKTOP_APP) {
+  console.log('[Asterisk Content] Skipping desktop app page - content script disabled');
+}
+
 import type { FieldNode, FieldType, FormFingerprint, FormSnapshot, SelectOption, FillCommand } from '@asterisk/core';
 
 // ============================================================================
@@ -586,9 +600,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // Initialize
 // ============================================================================
 
-// Run when content script loads
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', setupEventListeners);
-} else {
-  setupEventListeners();
+// Only initialize if we're NOT on the desktop app page
+if (!IS_DESKTOP_APP) {
+  // Run when content script loads
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupEventListeners);
+  } else {
+    setupEventListeners();
+  }
 }
