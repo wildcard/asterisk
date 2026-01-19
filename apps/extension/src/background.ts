@@ -132,25 +132,32 @@ async function sendFillCommandToTab(command: FillCommand): Promise<boolean> {
     return false;
   }
 
+  console.log('[Asterisk] Found', tabs.length, 'tabs for domain:', command.targetDomain, '- tabs:', tabs.map(t => ({ id: t.id, url: t.url })));
+
   // Try to send to the first matching tab
   for (const tab of tabs) {
     if (!tab.id) continue;
 
     try {
+      console.log('[Asterisk] Sending fill command to tab:', tab.id, tab.url);
       const response = await chrome.tabs.sendMessage(tab.id, {
         type: FILL_COMMAND_MESSAGE,
         payload: command,
       });
 
+      console.log('[Asterisk] Tab response:', response);
+
       if (response?.success) {
         return true;
       }
-    } catch {
+    } catch (error) {
+      console.warn('[Asterisk] Failed to send to tab:', tab.id, tab.url, error);
       // Tab may not have content script loaded, try next tab
       continue;
     }
   }
 
+  console.warn('[Asterisk] All tabs failed for domain:', command.targetDomain);
   return false;
 }
 
@@ -256,7 +263,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 // Service worker startup - ensure alarms are set up
 // This runs every time the service worker wakes up
 (async () => {
-  console.log('[Asterisk] Background service worker started');
+  console.log('[Asterisk] Background service worker started - Hot reload enabled via CRXJS');
 
   // Check if alarms already exist (they persist across restarts)
   const existingAlarms = await chrome.alarms.getAll();
