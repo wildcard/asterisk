@@ -1,0 +1,101 @@
+---
+session: asterisk-e2e-testing
+date: 2026-01-17
+status: complete
+outcome: SUCCEEDED
+---
+
+goal: Fixed form snapshot bug and verified with E2E testing
+now: Continue E2E test - add vault items and test LLM matching workflow
+test: Start desktop app (pnpm tauri dev), load test form at http://localhost:8000/test-form.html, verify Match tab shows localhost (not desktop app forms)
+
+done_this_session:
+  - task: Fixed form snapshot bug - desktop app forms no longer overwrite test forms
+    files: [apps/desktop/src-tauri/src/lib.rs]
+  - task: Committed form snapshot fix (commit d64be07)
+    files: [apps/desktop/src-tauri/src/lib.rs]
+  - task: Verified fix via E2E testing with Chrome automation
+    files: []
+  - task: Started HTTP server for test form fixtures
+    files: [apps/qa/fixtures/test-form.html]
+
+blockers: []
+
+questions: []
+
+decisions:
+  - form_snapshot_filtering: Added domain filtering to ignore snapshots from localhost:1420 and 127.0.0.1:1420 (desktop app itself). This prevents desktop app's own forms (Settings, Vault tabs) from overwriting external test form snapshots. Chose Option 1 (quick filter fix) over multi-snapshot storage.
+
+findings:
+  - bug_root_cause: Extension content script runs on ALL pages including desktop app itself (localhost:1420). When navigating between tabs, it triggered form detection and blindly overwrote stored snapshots.
+  - fix_location: apps/desktop/src-tauri/src/lib.rs:726-739 - added URL check before storing snapshot
+  - fix_verification: Logs show "[Asterisk HTTP] Ignoring snapshot from desktop app itself" when desktop app forms are detected
+  - vault_state: Vault is empty (in-memory storage cleared after Rust recompilation) - needs to be repopulated for continued E2E testing
+
+worked:
+  - Domain filtering approach - simple and effective
+  - Using Chrome automation (MCP) for E2E testing
+  - Checking logs to verify fix behavior
+
+failed: []
+
+next:
+  - Add vault items via desktop app Vault tab (company, jobTitle, email, phone)
+  - Return to Match tab and click "Generate Fill Plan" to test pattern matching (Tier 1 & 2)
+  - Enable LLM in Settings tab if needed
+  - Click "Analyze with AI" to test LLM matching (Tier 3)
+  - Test Review & Apply dialog with confidence scores
+  - Complete form injection workflow (send fill command, verify form fields filled)
+  - Document E2E test results in GitHub Issue #15
+
+files:
+  created: [thoughts/shared/handoffs/general/2026-01-17_15-30_form-snapshot-fix-e2e-test.yaml]
+  modified: [apps/desktop/src-tauri/src/lib.rs]
+
+# Additional Context
+
+## Bug Details
+**Problem**: Desktop app showing wrong form snapshot in Match tab (Settings page instead of test form)
+
+**Root Cause**: Extension detects forms on desktop app's own pages (localhost:1420) and overwrites test form snapshots
+
+**Fix**: Filter out snapshots from desktop app URLs before storing
+```rust
+// apps/desktop/src-tauri/src/lib.rs:726-739
+if snapshot.url.contains("localhost:1420") || snapshot.url.contains("127.0.0.1:1420") {
+    println!("[Asterisk HTTP] Ignoring snapshot from desktop app itself");
+    let mut response = Response::from_string(r#"{"status":"ignored"}"#);
+    // ... send response and continue
+}
+```
+
+## Test Environment
+- Desktop app: http://localhost:1420 (Tauri dev server)
+- HTTP bridge: http://127.0.0.1:17373
+- Test form: http://localhost:8000/test-form.html (Python HTTP server)
+- Desktop app background task: /private/tmp/claude/-Users-kobik-private-workspace-asterisk/tasks/b0d02ed.output
+
+## Verification Evidence
+Logs showing fix working:
+```
+[Asterisk HTTP] Received form snapshot: localhost (4 fields)
+[Asterisk HTTP] Ignoring snapshot from desktop app itself
+[Asterisk HTTP] Received form snapshot: localhost (7 fields)  ← Test form stored
+```
+
+## E2E Test Progress
+✅ Form snapshot bug identified and fixed
+✅ Fix committed (d64be07)
+✅ Fix verified via logs and UI
+✅ Test form loaded successfully
+⏸️ Vault empty - needs population to continue test
+⏸️ Pattern matching not yet tested
+⏸️ LLM matching not yet tested
+⏸️ Form injection not yet tested
+
+## Related Files
+- Test form: apps/qa/fixtures/test-form.html (7 fields: organization, position, contact, email, phone, subject, message)
+- E2E guide: apps/qa/E2E_TESTING_GUIDE.md
+- Architecture diagrams: docs/ARCHITECTURE_DIAGRAMS.md
+- Roadmap: ROADMAP.md
+- GitHub Issue #15: E2E Real-World Form Filling Test

@@ -1,0 +1,62 @@
+---
+session: general
+date: 2026-01-18
+status: partial
+outcome: PARTIAL_MINUS
+---
+
+goal: E2E test LLM matching and form fill workflow
+now: Debug background→content message passing for fill commands
+test: Navigate to localhost:8000/test-form.html and verify fields auto-fill after clicking "Apply 2 fields" in desktop app
+
+done_this_session:
+  - task: Added test vault items (email, phone)
+    files: [apps/desktop/src/VaultPanel.tsx]
+  - task: Generated fill plan with 95% confidence matches
+    files: [packages/core/src/matching.ts]
+  - task: Sent fill command from desktop app
+    files: [apps/desktop/src/MatchingPanel.tsx]
+  - task: Confirmed bug INJECT-001 still exists
+    files: [apps/extension/src/background.ts, apps/extension/src/content.ts]
+
+blockers:
+  - Fill commands report "completed" but fields remain empty in browser
+  - Background script polls every 1 minute via Chrome Alarms API
+  - Piggyback polling (on form snapshot) doesn't seem to work
+  - Cannot access background service worker console via browser automation
+
+findings:
+  - llm_matching_works: Autocomplete-based matching achieves 95% confidence for email/phone fields
+  - desktop_ui_works: Match tab, Generate Fill Plan, Review dialog all function correctly
+  - desktop_logs_show_completion: "[Asterisk HTTP] Fill command completed: fill-1768777948645-5ecsuhsna"
+  - fields_not_filled: Test form shows only placeholders (you@example.com, +1 (555) 000-0000)
+  - content_script_loads: Console logs prove content script is injected and running
+  - no_fill_logs: No console logs from content script showing fill command received
+
+worked:
+  - LLM matching via autocomplete attributes (email, tel)
+  - Desktop app UI for displaying matches and creating fill plans
+  - HTTP bridge communication (desktop ↔ extension)
+  - Form snapshot detection and transmission
+
+failed:
+  - Fill command execution (desktop says "completed" but fields remain empty)
+  - Background script polling mechanism (1-minute interval too slow)
+  - Piggyback polling on form snapshot (line 210 in background.ts)
+
+decisions:
+  - use_chrome_alarms_api: Chrome Alarms API has 1-minute minimum polling interval (Manifest V3 limitation)
+  - piggyback_on_snapshots: Added pollFillCommands() call when form snapshot received (line 210)
+  - http_bridge_architecture: Desktop app serves on localhost:17373, extension polls via GET /v1/fill-commands
+
+next:
+  - Access background service worker console in chrome://extensions
+  - Add diagnostic logging to background.ts sendFillCommandToTab() function
+  - Verify chrome.tabs.query() finds localhost tabs
+  - Verify chrome.tabs.sendMessage() is called with ASTERISK_FILL_COMMAND
+  - Check content script message listener (line 569-588 in content.ts)
+  - Consider reducing polling interval or using different architecture
+
+files:
+  created: [EXTENSION_RELOAD_REQUIRED.md, apps/extension/verify-extension.sh]
+  modified: [apps/extension/src/background.ts, apps/extension/src/content.ts, packages/core/src/matching.ts]
