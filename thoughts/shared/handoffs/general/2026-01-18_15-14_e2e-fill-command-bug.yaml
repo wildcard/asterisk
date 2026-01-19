@@ -1,12 +1,12 @@
 ---
 session: general
 date: 2026-01-18
-status: partial
-outcome: PARTIAL_MINUS
+status: complete
+outcome: SUCCEEDED
 ---
 
 goal: E2E test LLM matching and form fill workflow
-now: Debug background→content message passing for fill commands
+now: Bug fixed - E2E workflow working end-to-end
 test: Navigate to localhost:8000/test-form.html and verify fields auto-fill after clicking "Apply 2 fields" in desktop app
 
 done_this_session:
@@ -16,47 +16,53 @@ done_this_session:
     files: [packages/core/src/matching.ts]
   - task: Sent fill command from desktop app
     files: [apps/desktop/src/MatchingPanel.tsx]
-  - task: Confirmed bug INJECT-001 still exists
-    files: [apps/extension/src/background.ts, apps/extension/src/content.ts]
+  - task: Identified root cause - extension context invalidation on desktop app page
+    files: [apps/extension/src/content.ts]
+  - task: Fixed by excluding desktop app domain (localhost:1420) from content script
+    files: [apps/extension/src/content.ts]
+  - task: Added diagnostic logging to background script
+    files: [apps/extension/src/background.ts]
+  - task: Verified E2E workflow - fields successfully filled in browser
+    files: []
 
-blockers:
-  - Fill commands report "completed" but fields remain empty in browser
-  - Background script polls every 1 minute via Chrome Alarms API
-  - Piggyback polling (on form snapshot) doesn't seem to work
-  - Cannot access background service worker console via browser automation
+blockers: []
 
 findings:
   - llm_matching_works: Autocomplete-based matching achieves 95% confidence for email/phone fields
   - desktop_ui_works: Match tab, Generate Fill Plan, Review dialog all function correctly
-  - desktop_logs_show_completion: "[Asterisk HTTP] Fill command completed: fill-1768777948645-5ecsuhsna"
-  - fields_not_filled: Test form shows only placeholders (you@example.com, +1 (555) 000-0000)
-  - content_script_loads: Console logs prove content script is injected and running
-  - no_fill_logs: No console logs from content script showing fill command received
+  - root_cause_identified: Content script injected into desktop app page (localhost:1420) caused context invalidation
+  - context_invalidation_error: CRXJS hot reload invalidates extension context when content script tries chrome.runtime.sendMessage()
+  - fix_verified: Desktop app domain exclusion prevents content script initialization on localhost:1420
+  - e2e_working: Fields successfully filled - test@example.com and +1-555-123-4567 populated in form
 
 worked:
   - LLM matching via autocomplete attributes (email, tel)
   - Desktop app UI for displaying matches and creating fill plans
   - HTTP bridge communication (desktop ↔ extension)
   - Form snapshot detection and transmission
+  - Fill command execution (desktop → background → content → form fields)
+  - Desktop app domain exclusion (IS_DESKTOP_APP flag)
 
-failed:
-  - Fill command execution (desktop says "completed" but fields remain empty)
-  - Background script polling mechanism (1-minute interval too slow)
-  - Piggyback polling on form snapshot (line 210 in background.ts)
+failed: []
 
 decisions:
+  - exclude_desktop_app_domain: Prevent content script from initializing on localhost:1420 to avoid context invalidation
+  - add_diagnostic_logging: Log message passing flow in background.ts for debugging
   - use_chrome_alarms_api: Chrome Alarms API has 1-minute minimum polling interval (Manifest V3 limitation)
   - piggyback_on_snapshots: Added pollFillCommands() call when form snapshot received (line 210)
   - http_bridge_architecture: Desktop app serves on localhost:17373, extension polls via GET /v1/fill-commands
 
 next:
-  - Access background service worker console in chrome://extensions
-  - Add diagnostic logging to background.ts sendFillCommandToTab() function
-  - Verify chrome.tabs.query() finds localhost tabs
-  - Verify chrome.tabs.sendMessage() is called with ASTERISK_FILL_COMMAND
-  - Check content script message listener (line 569-588 in content.ts)
-  - Consider reducing polling interval or using different architecture
+  - Consider WebSocket connection for real-time push instead of polling
+  - Add more vault item types (address, name, etc.)
+  - Implement learning from user corrections
+  - Add support for multiple profiles (work/personal)
 
 files:
-  created: [EXTENSION_RELOAD_REQUIRED.md, apps/extension/verify-extension.sh]
-  modified: [apps/extension/src/background.ts, apps/extension/src/content.ts, packages/core/src/matching.ts]
+  created: [EXTENSION_RELOAD_REQUIRED.md, apps/extension/verify-extension.sh, thoughts/shared/handoffs/general/2026-01-18_15-14_e2e-fill-command-bug.yaml]
+  modified: [apps/extension/src/background.ts, apps/extension/src/content.ts]
+
+commits:
+  - b452b92: Fix extension context invalidation by excluding desktop app domain
+  - 0357cf5: Add diagnostic logging to background script message passing
+  - e8adc4b: Add extension build configuration and verification tooling
