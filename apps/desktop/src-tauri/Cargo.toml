@@ -25,7 +25,7 @@ chrono = { version = "0.4", features = ["serde"] }
 tiny_http = "0.12"
 urlencoding = "2.1"
 # System directory paths
-dirs = "5"
+dirs = "6"
 # HTTP client for LLM API
 reqwest = { version = "0.12", features = ["json"] }
 
