@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Matching Test Form</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .form-container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .description {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #007bff;
+      box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+    }
+    .required {
+      color: #dc3545;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .hint {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .hint strong {
+      color: #856404;
+    }
+  </style>
+</head>
+<body>
+  <div class="form-container">
+    <h1>LLM Matching Test Form</h1>
+    <p class="description">
+      This form has intentionally ambiguous field labels to test AI-powered form matching.
+      No autocomplete attributes are provided, so matching requires semantic understanding.
+    </p>
+
+    <div class="hint">
+      <strong>📝 Test Instructions:</strong><br>
+      1. Open Asterisk desktop app<br>
+      2. Go to Match tab → Generate Fill Plan<br>
+      3. Click "Analyze with AI" for unmatched fields<br>
+      4. Review Claude's suggestions and confidence scores
+    </div>
+
+    <form>
+      <!-- Ambiguous identity fields -->
+      <div class="form-group">
+        <label for="field1">Your info <span class="required">*</span></label>
+        <input type="text" id="field1" name="field1" required placeholder="Enter your details">
+      </div>
+
+      <div class="form-group">
+        <label for="field2">Contact details</label>
+        <input type="text" id="field2" name="field2" placeholder="How can we reach you?">
+      </div>
+
+      <div class="form-group">
+        <label for="field3">Personal identifier</label>
+        <input type="text" id="field3" name="field3" placeholder="Your ID">
+      </div>
+
+      <!-- Ambiguous work fields -->
+      <div class="form-group">
+        <label for="field4">Company <span class="required">*</span></label>
+        <input type="text" id="field4" name="field4" required placeholder="Where do you work?">
+      </div>
+
+      <div class="form-group">
+        <label for="field5">Role</label>
+        <input type="text" id="field5" name="field5" placeholder="What do you do?">
+      </div>
+
+      <!-- Very ambiguous field -->
+      <div class="form-group">
+        <label for="field6">Additional information</label>
+        <input type="text" id="field6" name="field6" placeholder="Anything else?">
+      </div>
+
+      <!-- Phone-like but ambiguous -->
+      <div class="form-group">
+        <label for="field7">Callback number</label>
+        <input type="text" id="field7" name="field7" placeholder="Best number to reach you">
+      </div>
+
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+
+  <script>
+    // Prevent actual submission for testing
+    document.querySelector('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      alert('Form submitted! (This is just a test - no data was sent)');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+---
+session: llm-matching-e2e-test
+date: 2026-01-19
+status: partial
+outcome: PARTIAL_MINUS
+---
+
+goal: Test LLM matching feature E2E - discovered architectural limitation
+now: Manual testing needed in Tauri native window (not Chrome browser)
+test: Manual E2E test in native Tauri window at /Users/kobik-private/workspace/asterisk/test-llm-form.html
+
+done_this_session:
+  - task: Fixed React state synchronization bug (hasApiKey not updating)
+    files: [apps/desktop/src/MatchingPanel.tsx:500-523]
+  - task: Discovered Tauri API limitation (Chrome vs native window)
+    files: [apps/desktop/src/llm-matching.ts:117-136]
+  - task: Created diagnostic investigation workflow using /debug skill
+    files: []
+  - task: Confirmed test infrastructure is ready (form, vault, API key)
+    files: [test-llm-form.html, READY-TO-TEST.md, LLM-TESTING-GUIDE.md]
+
+blockers:
+  - Chrome browser automation cannot control native Tauri window
+  - window.__TAURI_INTERNALS__ only available in Tauri native window, not at localhost:1420 in Chrome
+  - Must switch to manual testing for LLM analysis workflow
+
+questions:
+  - Should we add better error messaging when Tauri APIs are unavailable?
+  - Should localhost:1420 in Chrome show a warning that some features require native window?
+
+decisions:
+  - tauri_window_required: Tauri invoke commands (has_api_key, llm_analyze_field) only work in native Tauri window, not Chrome browser viewing localhost:1420. This is by design but should be documented.
+
+findings:
+  - react_state_sync: React visibility change event doesn't fire when navigating between tabs within same app window (Settings → Match). Workaround: Navigate to different tab (Forms) then back to trigger visibilitychange event and refresh hasApiKey state.
+  - tauri_api_availability: window.__TAURI_INTERNALS__ is undefined when viewing localhost:1420 in Chrome. Tauri APIs require native window. Button disabled state: "disabled={llmLoading || !hasApiKey}" at MatchingPanel.tsx:661
+  - button_state_misleading: Button appears visually clickable but is actually disabled (disabled=true), showing title "Configure API key in Settings" instead of the expected behavior.
+  - form_snapshot_pollution: Extension continuously captures forms from all open tabs (vancouver.craigslist.org, google.com, etc.), making "latest snapshot" unpredictable. Reloading test form makes it latest.
+
+worked:
+  - Using /debug skill to spawn investigation agent without burning main context
+  - JavaScript inspection via mcp__claude-in-chrome__javascript_tool to check DOM state and Tauri availability
+  - Backend log monitoring at /private/tmp/claude/-Users-kobik-private-workspace-asterisk/tasks/b0d02ed.output
+
+failed:
+  - Clicking "Analyze with AI" button in Chrome browser (Tauri APIs not available)
+  - Attempting to test E2E through browser automation (cannot control native Tauri window)
+  - First attempt at button click: hasApiKey state was stale, button actually disabled
+
+next:
+  - Switch to native Tauri window (already activated via osascript)
+  - Navigate to Match tab in Tauri window
+  - Reload test form at http://127.0.0.1:8765/test-llm-form.html
+  - Generate Fill Plan (should show 2 pattern matches, 5 unmatched)
+  - Click "Analyze with AI" button
+  - Monitor backend terminal for [LLM] logs showing Claude API calls
+  - Verify LLM recommendations appear with confidence scores
+  - Click "Review & Apply" and test auto-fill
+  - Document results: which fields matched, confidence scores, reasoning
+  - Consider adding UI warning when Tauri APIs unavailable
+
+files:
+  created: []
+  modified: []
