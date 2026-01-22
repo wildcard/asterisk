@@ -266,8 +266,13 @@ export function MatchingPanel() {
   const runLLMAnalysis = useCallback(async () => {
     if (!fillPlan || !snapshot || fillPlan.unmatchedFields.length === 0) return;
 
+    console.log('[LLM Analysis] Starting analysis...');
+    console.log('[LLM Analysis] Unmatched fields:', fillPlan.unmatchedFields);
+
     // Check if LLM matching is available
     const available = await isLLMMatchingAvailable();
+    console.log('[LLM Analysis] API key available:', available);
+
     if (!available) {
       setError('Please configure your Claude API key in Settings to use AI matching.');
       return;
@@ -283,23 +288,32 @@ export function MatchingPanel() {
         f => fillPlan.unmatchedFields.includes(f.id)
       );
 
+      console.log('[LLM Analysis] Found', unmatchedFieldNodes.length, 'unmatched field nodes');
+
       if (unmatchedFieldNodes.length === 0) return;
 
       const items = toVaultItems(vaultItems);
+      console.log('[LLM Analysis] Vault items:', items.map(i => i.key));
 
       // Call LLM matching for each field
       const llmRecommendations: FillRecommendation[] = [];
       for (const field of unmatchedFieldNodes) {
+        console.log(`[LLM Analysis] Analyzing field: ${field.label} (${field.id})`);
         try {
           const recommendation = await matchByLLM(field, items);
           if (recommendation) {
+            console.log(`[LLM Analysis] ✓ Match found: ${field.label} → ${recommendation.vaultKey} (${Math.round(recommendation.confidence * 100)}%)`);
             llmRecommendations.push(recommendation);
+          } else {
+            console.log(`[LLM Analysis] ✗ No match for: ${field.label}`);
           }
         } catch (err) {
-          console.error(`Failed to analyze field ${field.id}:`, err);
+          console.error(`[LLM Analysis] Failed to analyze field ${field.id}:`, err);
           // Continue with other fields
         }
       }
+
+      console.log('[LLM Analysis] Total LLM recommendations:', llmRecommendations.length);
 
       if (llmRecommendations.length > 0) {
         // Merge LLM recommendations into existing fill plan

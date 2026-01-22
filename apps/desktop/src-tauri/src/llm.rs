@@ -59,8 +59,15 @@ pub async fn analyze_field_with_llm(
     request: AnalyzeFieldRequest,
     api_key: &str,
 ) -> Result<AnalyzeFieldResponse, String> {
+    println!(
+        "[LLM] Analyzing field: label='{}', name='{}', type='{}'",
+        request.label, request.name, request.field_type
+    );
+    println!("[LLM] Available vault keys: {:?}", request.available_keys);
+
     // Build the prompt
     let prompt = build_prompt(&request);
+    println!("[LLM] Prompt length: {} chars", prompt.len());
 
     // Call Claude API
     let client = reqwest::Client::new();
@@ -73,6 +80,7 @@ pub async fn analyze_field_with_llm(
         }],
     };
 
+    println!("[LLM] Sending request to Claude API...");
     let response = client
         .post("https://api.anthropic.com/v1/messages")
         .header("x-api-key", api_key)
@@ -81,18 +89,27 @@ pub async fn analyze_field_with_llm(
         .json(&claude_request)
         .send()
         .await
-        .map_err(|e| format!("API request failed: {}", e))?;
+        .map_err(|e| {
+            eprintln!("[LLM] API request failed: {}", e);
+            format!("API request failed: {}", e)
+        })?;
 
-    if !response.status().is_success() {
-        let status = response.status();
+    let status = response.status();
+    println!("[LLM] API response status: {}", status);
+
+    if !status.is_success() {
         let body = response.text().await.unwrap_or_default();
+        eprintln!("[LLM] API error response: {}", body);
         return Err(format!("API returned {}: {}", status, body));
     }
 
     let claude_response: ClaudeResponse = response
         .json()
         .await
-        .map_err(|e| format!("Failed to parse API response: {}", e))?;
+        .map_err(|e| {
+            eprintln!("[LLM] Failed to parse API response: {}", e);
+            format!("Failed to parse API response: {}", e)
+        })?;
 
     // Parse the response
     let text = claude_response
@@ -101,7 +118,15 @@ pub async fn analyze_field_with_llm(
         .map(|c| c.text.as_str())
         .unwrap_or("");
 
-    parse_llm_response(text, &request.available_keys)
+    println!("[LLM] Claude response: {}", text);
+
+    let result = parse_llm_response(text, &request.available_keys)?;
+    println!(
+        "[LLM] Match result: vault_key={:?}, confidence={:.2}, reasoning='{}'",
+        result.vault_key, result.confidence, result.reasoning
+    );
+
+    Ok(result)
 }
 
 /// Build the prompt for Claude API
