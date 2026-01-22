@@ -6,6 +6,9 @@
   "scripts": {
     "setup": "./scripts/setup-test-form.sh",
     "test": "playwright test",
+    "test:desktop": "playwright test --project=desktop-app",
+    "test:extension": "playwright test --project=extension-popup",
+    "test:all": "pnpm test:desktop && pnpm test:extension",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "test:headed": "playwright test --headed",

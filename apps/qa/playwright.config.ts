@@ -1,10 +1,23 @@
 import { defineConfig, devices } from '@playwright/test';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const EXTENSION_PATH = resolve(__dirname, '../extension/dist');
 
 /**
  * Playwright configuration for Asterisk E2E tests
  *
- * Assumes the Tauri dev server is running on localhost:1420
- * Run tests with: pnpm test
+ * Projects:
+ * - desktop-app: Tests for Tauri desktop application (localhost:1420)
+ * - extension-popup: Tests for Chrome extension popup (requires headed mode)
+ *
+ * Run tests with:
+ * - pnpm test:desktop - Desktop app tests only
+ * - pnpm test:extension - Extension popup tests only
+ * - pnpm test - All tests
  */
 export default defineConfig({
   testDir: './e2e-tests',
@@ -22,8 +35,17 @@ export default defineConfig({
 
   projects: [
     {
-      name: 'chromium',
+      name: 'desktop-app',
       use: { ...devices['Desktop Chrome'] },
+      testMatch: /llm-matching\.spec\.ts/,
+    },
+    {
+      name: 'extension-popup',
+      use: {
+        ...devices['Desktop Chrome'],
+        headless: false, // Required for Chrome extensions
+      },
+      testMatch: /extension-popup\.spec\.ts/,
     },
   ],
 
