@@ -1,0 +1,170 @@
+name: Extension Tests
+
+# Only run when extension or QA code changes
+on:
+  pull_request:
+    paths:
+      - 'apps/extension/**'
+      - 'apps/qa/**'
+      - '.github/workflows/extension-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/extension/**'
+      - 'apps/qa/**'
+      - '.github/workflows/extension-tests.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  playwright-tests:
+    name: Playwright Extension Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: |
+          cd apps/extension
+          pnpm build
+
+      - name: Verify extension build
+        run: |
+          echo "Checking extension dist directory..."
+          ls -la apps/extension/dist/
+          test -f apps/extension/dist/manifest.json || (echo "Extension manifest not found" && exit 1)
+          echo "Extension built successfully"
+
+      - name: Install Playwright browsers
+        run: |
+          cd apps/qa
+          npx playwright install chromium
+
+      - name: Run Playwright extension tests
+        run: |
+          cd apps/qa
+          pnpm test:extension
+        env:
+          CI: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: apps/qa/test-results/
+          retention-days: 7
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/qa/playwright-report/
+          retention-days: 7
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-screenshots
+          path: apps/qa/e2e-tests/**/*-snapshots/
+          retention-days: 7
+
+  lint-and-type-check:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check extension
+        run: |
+          cd apps/extension
+          pnpm exec tsc --noEmit
+
+      - name: Type check QA tests
+        run: |
+          cd apps/qa
+          pnpm exec tsc --noEmit
+
+  build-check:
+    name: Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension (production)
+        run: |
+          cd apps/extension
+          pnpm build
+
+      - name: Check bundle size
+        run: |
+          cd apps/extension/dist
+          echo "Extension bundle size:"
+          du -sh .
+          echo ""
+          echo "Largest files:"
+          find . -type f -exec du -h {} + | sort -rh | head -10
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [playwright-tests, lint-and-type-check, build-check]
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          echo "Test Results Summary" >> summary.txt
+          echo "Playwright Tests: ${{ needs.playwright-tests.result }}" >> summary.txt
+          echo "Lint and Type Check: ${{ needs.lint-and-type-check.result }}" >> summary.txt
+          echo "Build Check: ${{ needs.build-check.result }}" >> summary.txt
+          cat summary.txt

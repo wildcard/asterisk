@@ -1,77 +1,340 @@
-# Asterisk QA Automation
+# Asterisk QA Testing
 
-Automated end-to-end testing for the Asterisk desktop application.
+Comprehensive end-to-end testing suite for the Asterisk password manager, covering desktop app, browser extension, and LLM-powered form filling.
 
-## Setup
+---
+
+## 🚀 Quick Start
 
 ```bash
 # Install dependencies
 pnpm install
 
-# Set Claude API key for LLM tests (optional - will use placeholder if not set)
-export CLAUDE_API_KEY="sk-ant-..."
+# Build extension (required for tests)
+cd ../extension && pnpm build && cd ../qa
+
+# Run Playwright tests (fast, headless)
+pnpm test:extension
+
+# Run native macOS tests (real Chrome, full context)
+cd scripts
+python3 native_extension_test.py
 ```
 
-## Running Tests
+---
+
+## 📋 Test Types
+
+| Type | Tool | Speed | Context | CI | Best For |
+|------|------|-------|---------|----|----|
+| **Playwright** | TypeScript | Fast | Limited | ✅ | UI rendering, visual regression |
+| **Native macOS** | Python + AppleScript | Medium | Full | ❌ | Form fill, real workflows |
+| **LLM Matching** | TypeScript | Slow | Full | ⚠️ | AI field matching accuracy |
+
+**See:** [Testing Strategy Guide](./docs/TESTING-STRATEGY.md) for when to use each type.
+
+---
+
+## 📖 Documentation
+
+| Guide | Purpose |
+|-------|---------|
+| [Testing Strategy](./docs/TESTING-STRATEGY.md) | When to use each test type |
+| [Adding Tests](./docs/ADDING-TESTS.md) | How to write new test cases |
+| [Troubleshooting](./docs/TROUBLESHOOTING.md) | Common issues and fixes |
+| [Extension Testing](./EXTENSION-TESTING-GUIDE.md) | Deep dive on Playwright limitations |
+| [Native Testing](./NATIVE-EXTENSION-TESTING.md) | macOS automation setup |
+
+---
+
+## 🧪 Running Tests
+
+### Playwright Tests
 
 ```bash
-# Setup test environment (post test form to HTTP bridge)
-pnpm setup
-
-# Run all tests (headless)
+# All Playwright tests
 pnpm test
 
-# Run setup + tests
-pnpm test:full
+# Extension tests only
+pnpm test:extension
 
-# Run with UI mode (interactive)
+# With UI (interactive)
 pnpm test:ui
 
-# Run in headed mode (see browser)
+# Headed mode (see browser)
 pnpm test:headed
 
-# Debug mode
+# Debug mode (step through)
 pnpm test:debug
+
+# Update screenshots
+pnpm test:extension --update-snapshots
 ```
 
-## Test Structure
+### Native macOS Tests
+
+```bash
+cd scripts
+
+# First time: calibrate extension icon location
+./calibrate_extension_icon.sh
+
+# Run native tests
+python3 native_extension_test.py
+```
+
+### LLM Matching Tests
+
+```bash
+# Requires Claude API key
+export CLAUDE_API_KEY="sk-ant-..."
+
+# Setup + run
+pnpm test:full
+
+# Setup only (start test server)
+pnpm setup
+```
+
+---
+
+## 🏗️ Project Structure
 
 ```
 apps/qa/
-├── e2e-tests/          # Playwright E2E tests
-│   └── llm-matching.spec.ts
-├── fixtures/           # Test data
-│   └── vault-items.json
-├── test-plans/         # Manual test documentation
+├── docs/                      # Documentation
+│   ├── TESTING-STRATEGY.md    # When to use each test type
+│   ├── ADDING-TESTS.md        # How to add tests
+│   └── TROUBLESHOOTING.md     # Common issues
+│
+├── e2e-tests/                 # Playwright E2E tests
+│   ├── extension-popup.spec.ts      # Extension UI tests (7 tests)
+│   └── llm-matching.spec.ts         # LLM field matching tests
+│
+├── fixtures/                  # Test data
+│   ├── extension-context.ts   # Extension loading helpers
+│   └── vault-items.json        # Sample vault data
+│
+├── scripts/                   # Native automation
+│   ├── calibrate_extension_icon.sh  # Interactive calibration
+│   ├── native_extension_test.py     # macOS automation tests
+│   ├── setup-test-form.sh           # Start test form server
+│   └── .extension-coords            # Saved coordinates (git-ignored)
+│
+├── test-plans/                # Manual test docs
 │   └── llm-matching-manual.md
-└── playwright.config.ts
+│
+└── playwright.config.ts       # Test configuration
 ```
 
-## Test Coverage
+---
 
-### LLM Matching E2E (`llm-matching.spec.ts`)
+## 🎯 Test Coverage
+
+### Extension Popup Tests (Playwright)
+
+**UI Rendering (7 tests):**
+- ✅ Header displays correctly
+- ✅ Footer shows connection status
+- ✅ Settings button visible
+- ✅ Empty state shown when no form
+- ✅ Empty state displays clipboard icon
+- ✅ No action buttons in empty state
+- ✅ Visual regression baseline
+
+**Native macOS Tests:**
+- ✅ Extension icon click automation
+- ✅ Popup content verification
+- ✅ Screenshot capture
+- ⏸️ Form fill workflow (manual verification)
+
+### LLM Matching Tests (Playwright)
 
 - ✅ Phase 1: Vault item setup
 - ✅ Phase 2: API key configuration
 - ✅ Phase 3: Pattern + LLM matching workflow
 - ✅ Phase 4: Review dialog verification
 - ✅ Phase 5: Error handling (no API key, invalid fields)
-- ✅ Success Criteria: Full workflow integration
 
-## Requirements
+---
 
-- Desktop app must be running on `localhost:1420` (or use `webServer` config to auto-start)
-- HTTP bridge on `127.0.0.1:17373` (for form posting)
-- Valid Claude API key (for LLM tests)
+## 🔧 Prerequisites
 
-## CI/CD
+### For Playwright Tests
+- Node.js 20+
+- pnpm 9+
+- Extension built at `apps/extension/dist`
 
-Tests can run in CI with:
-```bash
-CI=1 pnpm test
+### For Native macOS Tests
+- macOS (AppleScript automation)
+- Chrome at `/Applications/Google Chrome.app`
+- `cliclick` (installed via `brew install cliclick`)
+- Extension built at `apps/extension/dist`
+
+### For LLM Tests
+- Desktop app running on `http://127.0.0.1:17373`
+- Test form server on `http://127.0.0.1:8765`
+- Valid Claude API key (`export CLAUDE_API_KEY="..."`)
+
+---
+
+## 🤖 CI/CD Integration
+
+Tests automatically run in GitHub Actions when extension or QA code changes.
+
+### What Runs in CI
+
+**✅ Runs:**
+- Playwright UI tests
+- Visual regression tests
+- Extension build verification
+
+**❌ Skipped:**
+- Desktop app connection tests (no app in CI)
+- Native macOS tests (requires GUI)
+- LLM tests (requires API key)
+
+### Workflow Trigger
+
+```yaml
+# .github/workflows/extension-tests.yml
+on:
+  pull_request:
+    paths:
+      - 'apps/extension/**'
+      - 'apps/qa/**'
 ```
 
-This enables:
-- Retry on failure (2 retries)
-- Single worker (no parallelism)
-- HTML reporter for artifacts
+### CI Environment Detection
+
+Tests automatically skip desktop-dependent tests via:
+
+```typescript
+test.skip(process.env.CI === 'true', 'Requires local desktop app');
+```
+
+**See:** [Adding Tests Guide](./docs/ADDING-TESTS.md#skipping-tests-in-ci)
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Extension not found | Run `cd ../extension && pnpm build` |
+| Screenshot diff failed | Run `pnpm test:extension --update-snapshots` |
+| Native test clicks wrong spot | Run `./scripts/calibrate_extension_icon.sh` |
+| Desktop app connection failed | Start app: `cd ../desktop && pnpm tauri dev` |
+| Permission denied (macOS) | Grant Accessibility permission to Terminal |
+
+**Full guide:** [Troubleshooting Guide](./docs/TROUBLESHOOTING.md)
+
+---
+
+## ➕ Adding New Tests
+
+### Playwright Test (UI only)
+
+```typescript
+test('new feature renders correctly', async () => {
+  const element = popupPage.locator('.my-feature');
+  await expect(element).toBeVisible();
+  await expect(element).toHaveText('Expected Text');
+});
+```
+
+### Native Test (Full workflow)
+
+```python
+def test_new_workflow(self):
+    self.click_extension_icon()
+    self.click_button("Fill Form")
+    value = self.get_form_field_value('email')
+    assert value == 'expected@example.com'
+```
+
+**Full guide:** [Adding Tests Guide](./docs/ADDING-TESTS.md)
+
+---
+
+## 📊 Test Reports
+
+After running tests, view results:
+
+```bash
+# Playwright HTML report
+pnpm exec playwright show-report
+
+# Or open manually
+open playwright-report/index.html
+
+# Screenshots from native tests
+ls /tmp/extension-test-*.png
+```
+
+---
+
+## 🔗 Related Documentation
+
+- [Extension Testing Guide](./EXTENSION-TESTING-GUIDE.md) - Playwright limitations explained
+- [Native Testing Guide](./NATIVE-EXTENSION-TESTING.md) - macOS automation setup
+- [Quick Start Guide](./QUICK-START-NATIVE-TESTING.md) - Fast native test setup
+- [Test Report](./TEST_REPORT.md) - Latest test results
+
+---
+
+## 🎓 Best Practices
+
+1. **UI tests → Playwright** (fast, reliable, runs in CI)
+2. **Workflow tests → Native macOS** (real Chrome, full context)
+3. **Always calibrate** before running native tests (coordinates drift)
+4. **Update screenshots** when UI intentionally changes
+5. **Skip desktop tests in CI** using `test.skip(process.env.CI)`
+6. **Use semantic selectors** (`.popup-header` not `.css-1x2y3z4`)
+
+---
+
+## 📝 Notes
+
+### Playwright Limitations
+
+Playwright tests open the popup via `chrome-extension://` URL, which means:
+- ❌ Popup has no tab context (sees itself as active tab)
+- ❌ Cannot test form detection or field matching
+- ✅ Perfect for UI rendering and empty states
+
+Use native macOS tests for full integration testing.
+
+### Native Test Calibration
+
+Extension icon coordinates change when:
+- Chrome version updates
+- Display resolution changes
+- Chrome window is resized
+
+Always re-run `./calibrate_extension_icon.sh` if tests start missing clicks.
+
+---
+
+## 🆘 Getting Help
+
+1. Check [Troubleshooting Guide](./docs/TROUBLESHOOTING.md)
+2. Run in debug mode: `PWDEBUG=1 pnpm test:extension`
+3. Check test screenshots in `test-results/` or `/tmp/`
+4. Open an issue with error message + environment details
+
+---
+
+## 🚢 Roadmap
+
+- [ ] Add more Playwright tests for error states
+- [ ] Expand native test coverage (fill verification, multiple forms)
+- [ ] Add performance benchmarks for LLM matching
+- [ ] Integrate native tests in CI (self-hosted macOS runner)
+- [ ] Add visual regression for native screenshots
+
+---
+
+**Last Updated:** 2026-01-23

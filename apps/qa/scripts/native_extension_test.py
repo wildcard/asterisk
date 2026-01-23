@@ -208,6 +208,127 @@ class ChromeExtensionTester:
             print(f"   ❌ Failed to verify: {e.stderr}")
             return False
 
+    def verify_fill_button_exists(self):
+        """Check if fill button exists in popup"""
+        print("🔍 Checking for fill button...")
+
+        script = """
+        tell application "System Events"
+            tell process "Google Chrome"
+                try
+                    set fillButton to button "Fill All Matched Fields" of front window
+                    return true
+                on error
+                    return false
+                end try
+            end tell
+        end tell
+        """
+
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True
+        )
+
+        exists = "true" in result.stdout.lower()
+        status = "✅" if exists else "⚠️"
+        print(f"   {status} Fill button exists: {exists}")
+        return exists
+
+    def click_element_by_text(self, button_text):
+        """Click a button or element by its text label"""
+        print(f"🖱️  Clicking element: {button_text}")
+
+        script = f"""
+        tell application "System Events"
+            tell process "Google Chrome"
+                try
+                    click button "{button_text}" of front window
+                    return true
+                on error errMsg
+                    return "Error: " & errMsg
+                end try
+            end tell
+        end tell
+        """
+
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True
+        )
+
+        success = "true" in result.stdout.lower()
+        if success:
+            print("   ✅ Click successful")
+            time.sleep(1)
+        else:
+            print(f"   ⚠️  Click may have failed: {result.stdout.strip()}")
+
+        return success
+
+    def get_form_field_value(self, field_id):
+        """
+        Get value of a form field using JavaScript execution
+
+        Returns the field value, or None if field doesn't exist
+        """
+        print(f"🔍 Reading form field: {field_id}")
+
+        script = f"""
+        tell application "Google Chrome"
+            try
+                tell active tab of front window
+                    execute javascript "
+                        const field = document.getElementById('{field_id}');
+                        field ? field.value : 'FIELD_NOT_FOUND';
+                    "
+                end tell
+            on error
+                return "ERROR_READING_FIELD"
+            end try
+        end tell
+        """
+
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True
+        )
+
+        value = result.stdout.strip()
+
+        if "FIELD_NOT_FOUND" in value:
+            print(f"   ⚠️  Field '{field_id}' not found")
+            return None
+        elif "ERROR" in value:
+            print(f"   ❌ Error reading field: {value}")
+            return None
+        else:
+            print(f"   Value: {value}")
+            return value
+
+    def verify_empty_vault_handling(self):
+        """
+        Test error handling when vault is empty
+
+        This simulates the case where no vault data is available
+        """
+        print("\n🧪 Testing empty vault handling...")
+
+        # Popup should still open and show appropriate message
+        # (This test assumes popup is already open)
+
+        screenshot = self.take_screenshot("empty-vault")
+
+        print("   ℹ️  Manual verification needed:")
+        print("   - Check screenshot for empty state message")
+        print("   - Verify no crashes or errors")
+        print(f"   - Screenshot: {screenshot}")
+
+        return True  # Manual verification
+
     def cleanup(self):
         """Clean up resources"""
         print("\n🧹 Cleaning up...")

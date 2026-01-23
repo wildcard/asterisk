@@ -66,13 +66,38 @@ export async function openPopupForTab(context: BrowserContext, extensionId: stri
 }
 
 /**
+ * Wait for desktop app API to be ready by attempting to connect
+ *
+ * @param maxRetries - Maximum number of retry attempts (default: 20)
+ * @param delayMs - Delay between retries in ms (default: 500)
+ */
+async function waitForDesktopApp(maxRetries: number = 20, delayMs: number = 500): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      // Try a simple GET to the vault endpoint
+      const response = await fetch('http://127.0.0.1:17373/v1/vault');
+      // If we get any response (even 404/500), server is up
+      return;
+    } catch (error) {
+      // Server not ready yet, wait and retry
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error('Desktop app did not become ready after ' + (maxRetries * delayMs / 1000) + ' seconds');
+}
+
+/**
  * Seeds vault data by making POST requests to the desktop app API
  *
  * Assumes desktop app is running on http://127.0.0.1:17373
+ * Waits for the server to be ready before seeding data
  *
  * @param items - Array of vault items to seed
  */
 export async function seedVaultData(items: any[]): Promise<void> {
+  // Wait for desktop app to be ready first
+  await waitForDesktopApp();
+
   for (const item of items) {
     await fetch('http://127.0.0.1:17373/v1/vault', {
       method: 'POST',
@@ -98,4 +123,57 @@ export async function clearVaultData(): Promise<void> {
       method: 'DELETE',
     });
   }
+}
+
+/**
+ * Helper to check if running in CI environment
+ *
+ * Returns true if CI=true environment variable is set
+ * Use this to skip tests that require local desktop app or GUI
+ */
+export function skipInCI(): boolean {
+  return process.env.CI === 'true';
+}
+
+/**
+ * Mock desktop app offline state by blocking all requests to desktop API
+ *
+ * @param page - The page to apply the mock to
+ *
+ * @example
+ * await mockDesktopOffline(popupPage);
+ * await popupPage.reload();
+ * // Desktop connection will now fail
+ */
+export async function mockDesktopOffline(page: any): Promise<void> {
+  await page.route('http://127.0.0.1:17373/**', (route: any) =>
+    route.abort('failed')
+  );
+}
+
+/**
+ * Wait for popup to finish loading and be ready for interaction
+ *
+ * Waits for:
+ * - DOM content to load
+ * - Loading spinners to disappear (if present)
+ * - Short stabilization period
+ *
+ * @param page - The popup page to wait for
+ * @param timeout - Maximum wait time in ms (default: 5000)
+ *
+ * @example
+ * await popupPage.goto(popupUrl);
+ * await waitForPopupReady(popupPage);
+ * // Now safe to interact with popup
+ */
+export async function waitForPopupReady(page: any, timeout: number = 5000): Promise<void> {
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(500);
+
+  // Wait for loading spinner to disappear (if it exists)
+  const spinner = page.locator('.loading-spinner, .spinner, [data-loading="true"]');
+  await spinner.waitFor({ state: 'hidden', timeout }).catch(() => {
+    // Spinner may not exist, that's ok
+  });
 }
