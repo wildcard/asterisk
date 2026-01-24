@@ -5,7 +5,8 @@
  * to the desktop app via localhost HTTP.
  */
 
-import type { FormSnapshot, FillCommand } from '@asterisk/core';
+import type { FormSnapshot, FillCommand, FillPlan, VaultItem, FieldFill } from '@asterisk/core';
+import { generateFillPlan } from '@asterisk/core';
 
 // ============================================================================
 // Constants
@@ -25,9 +26,66 @@ let lastConnectionAttempt = 0;
 let isDesktopAvailable = true;
 const CONNECTION_RETRY_INTERVAL = 5000; // 5 seconds
 
+// Store latest form snapshots per tab for popup access
+const formSnapshotsByTab = new Map<number, FormSnapshot>();
+
+// Cache vault data for local fill plan generation
+let cachedVaultItems: VaultItem[] = [];
+
 // ============================================================================
 // Desktop Communication
 // ============================================================================
+
+/**
+ * Fetch vault items from desktop app for local fill plan generation
+ */
+async function fetchVaultItems(): Promise<VaultItem[]> {
+  if (!isDesktopAvailable) return cachedVaultItems;
+
+  try {
+    const response = await fetch('http://127.0.0.1:17373/v1/vault', {
+      method: 'GET',
+    });
+
+    if (response.ok) {
+      const items: VaultItem[] = await response.json();
+      cachedVaultItems = items;
+      isDesktopAvailable = true;
+      return items;
+    }
+
+    // HTTP error response - mark desktop as unavailable
+    isDesktopAvailable = false;
+    return cachedVaultItems;
+  } catch {
+    // Network error - mark desktop as unavailable
+    isDesktopAvailable = false;
+    return cachedVaultItems;
+  }
+}
+
+/**
+ * Generate fill plan locally using @asterisk/core matching
+ */
+async function generateLocalFillPlan(snapshot: FormSnapshot): Promise<FillPlan | null> {
+  try {
+    // Ensure we have vault data
+    if (cachedVaultItems.length === 0) {
+      await fetchVaultItems();
+    }
+
+    if (cachedVaultItems.length === 0) {
+      return null;
+    }
+
+    // Generate fill plan using core matching logic
+    const fillPlan = generateFillPlan(snapshot, cachedVaultItems);
+    return fillPlan;
+  } catch (error) {
+    console.error('[Asterisk] Failed to generate fill plan:', error);
+    return null;
+  }
+}
 
 async function sendToDesktop(snapshot: FormSnapshot): Promise<boolean> {
   // Rate limit connection attempts when desktop is unavailable
@@ -194,12 +252,119 @@ async function startHealthCheckAlarm(): Promise<void> {
 }
 
 // ============================================================================
+// Popup Message Handlers
+// ============================================================================
+
+/**
+ * Handle GET_POPUP_DATA - return current form and fill plan for a tab
+ */
+async function handleGetPopupData(tabId: number): Promise<any> {
+  const snapshot = formSnapshotsByTab.get(tabId);
+
+  if (!snapshot) {
+    return {
+      type: 'FORM_DATA',
+      form: null,
+      fillPlan: null,
+    };
+  }
+
+  // Generate fill plan locally
+  const fillPlan = await generateLocalFillPlan(snapshot);
+
+  return {
+    type: 'FORM_DATA',
+    form: snapshot,
+    fillPlan: fillPlan,
+  };
+}
+
+/**
+ * Handle GET_DESKTOP_STATUS - return desktop connection status
+ */
+function handleGetDesktopStatus(): any {
+  return {
+    type: 'DESKTOP_STATUS',
+    connected: isDesktopAvailable,
+  };
+}
+
+/**
+ * Handle EXECUTE_FILL - create fill command and send to content script
+ */
+async function handleExecuteFill(fillPlan: FillPlan, formSnapshot: FormSnapshot): Promise<any> {
+  try {
+    // Find the active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      return { type: 'ERROR', message: 'No active tab found' };
+    }
+
+    // Resolve vault values for each recommendation
+    const fills: FieldFill[] = [];
+    for (const recommendation of fillPlan.recommendations) {
+      if (recommendation.confidence === 0) continue;
+
+      // Find the vault item
+      const vaultItem = cachedVaultItems.find(item => item.key === recommendation.vaultKey);
+      if (!vaultItem) {
+        console.warn('[Asterisk] Vault item not found:', recommendation.vaultKey);
+        continue;
+      }
+
+      fills.push({
+        fieldId: recommendation.fieldId,
+        value: vaultItem.value,
+      });
+    }
+
+    if (fills.length === 0) {
+      return { type: 'ERROR', message: 'No fields to fill' };
+    }
+
+    // Create fill command
+    const fillCommand: FillCommand = {
+      id: `popup-fill-${Date.now()}`,
+      targetDomain: formSnapshot.domain,
+      fills,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString(), // 1 minute expiry
+    };
+
+    // Send directly to the tab's content script
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: FILL_COMMAND_MESSAGE,
+      payload: fillCommand,
+    });
+
+    if (response?.success) {
+      return {
+        type: 'FILL_RESULT',
+        success: true,
+        filledCount: fillCommand.fills.length,
+      };
+    }
+
+    return { type: 'ERROR', message: 'Fill command failed' };
+  } catch (error) {
+    console.error('[Asterisk] Execute fill failed:', error);
+    return { type: 'ERROR', message: 'Failed to send fill command' };
+  }
+}
+
+// ============================================================================
 // Message Handling
 // ============================================================================
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Handle form snapshots from content scripts
   if (message.type === DESKTOP_BRIDGE_MESSAGE && message.payload) {
     const snapshot = message.payload as FormSnapshot;
+
+    // Store snapshot for popup access
+    if (sender.tab?.id) {
+      formSnapshotsByTab.set(sender.tab.id, snapshot);
+    }
 
     // Fire and forget - don't block the content script
     sendToDesktop(snapshot).then((success) => {
@@ -213,10 +378,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     // Acknowledge receipt
     sendResponse({ received: true });
+    return true;
   }
 
-  // Return true to indicate async response (even though we don't use it)
-  return true;
+  // Handle popup messages (async)
+  if (message.type === 'GET_POPUP_DATA') {
+    const tabId = message.payload?.tabId;
+    if (tabId) {
+      handleGetPopupData(tabId).then(sendResponse);
+      return true; // Will respond asynchronously
+    }
+  }
+
+  if (message.type === 'GET_DESKTOP_STATUS') {
+    sendResponse(handleGetDesktopStatus());
+    return true;
+  }
+
+  if (message.type === 'EXECUTE_FILL') {
+    const { fillPlan, formSnapshot } = message.payload;
+    if (fillPlan && formSnapshot) {
+      handleExecuteFill(fillPlan, formSnapshot).then(sendResponse);
+      return true; // Will respond asynchronously
+    }
+  }
+
+  // Return false for unhandled messages
+  return false;
 });
 
 // ============================================================================
@@ -230,9 +418,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     const wasAvailable = isDesktopAvailable;
     await checkDesktopHealth();
 
-    // Start fill polling when desktop becomes available
+    // Start fill polling and fetch vault when desktop becomes available
     if (!wasAvailable && isDesktopAvailable) {
       await startFillCommandPolling();
+      await fetchVaultItems();
     }
   }
 
@@ -257,6 +446,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   const available = await checkDesktopHealth();
   if (available) {
     await startFillCommandPolling();
+    await fetchVaultItems();
   }
 });
 
@@ -282,5 +472,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   } else if (available) {
     // Poll immediately on startup even if alarm exists
     pollFillCommands();
+  }
+
+  // Fetch vault items if desktop is available
+  if (available) {
+    await fetchVaultItems();
   }
 })();

@@ -60,6 +60,12 @@ importers:
       '@asterisk/core':
         specifier: workspace:*
         version: link:../../packages/core
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
     devDependencies:
       '@crxjs/vite-plugin':
         specifier: ^2.3.0
@@ -67,6 +73,15 @@ importers:
       '@types/chrome':
         specifier: ^0.0.268
         version: 0.0.268
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.27
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.27)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@6.4.1(@types/node@22.19.7))
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

@@ -23,6 +23,15 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
+    "default_title": "Asterisk Form Filler"
+  },
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
