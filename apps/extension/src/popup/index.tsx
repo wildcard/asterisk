@@ -7,6 +7,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Popup } from './popup';
+import { ErrorBoundary } from './ErrorBoundary';
 import './popup.css';
 
 const container = document.getElementById('root');
@@ -17,6 +18,8 @@ if (!container) {
 const root = createRoot(container);
 root.render(
   <StrictMode>
-    <Popup />
+    <ErrorBoundary>
+      <Popup />
+    </ErrorBoundary>
   </StrictMode>
 );

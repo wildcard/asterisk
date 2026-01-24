@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import type { FormSnapshot, FillPlan } from '@asterisk/core';
+import { SettingsModal } from './SettingsModal';
 
 // ============================================================================
 // Types
@@ -22,6 +23,7 @@ interface PopupState {
   currentForm: FormSnapshot | null;
   fillPlan: FillPlan | null;
   filling: boolean;
+  showSettings: boolean;
 }
 
 // Message types for background responses
@@ -43,6 +45,7 @@ export function Popup() {
     currentForm: null,
     fillPlan: null,
     filling: false,
+    showSettings: false,
   });
 
   // Load initial data on mount
@@ -121,10 +124,17 @@ export function Popup() {
     }
   };
 
-  const handleOpenDesktop = () => {
-    // TODO: Implement desktop app opening
-    // For now, just log
-    console.log('[Popup] Opening desktop app for review');
+  const handleOpenDesktop = async () => {
+    if (!state.desktopConnected) {
+      setState(prev => ({
+        ...prev,
+        error: 'Desktop app not running. Please start Asterisk first.',
+      }));
+      return;
+    }
+
+    await chrome.tabs.create({ url: 'http://localhost:1420' });
+    window.close();
   };
 
   // ============================================================================
@@ -237,10 +247,18 @@ export function Popup() {
           </span>
         </div>
 
-        <button className="settings-button" onClick={() => console.log('Settings')}>
+        <button
+          className="settings-button"
+          onClick={() => setState(prev => ({ ...prev, showSettings: true }))}
+        >
           ⚙ Settings
         </button>
       </div>
+
+      {/* Settings Modal */}
+      {state.showSettings && (
+        <SettingsModal onClose={() => setState(prev => ({ ...prev, showSettings: false }))} />
+      )}
     </>
   );
 }
