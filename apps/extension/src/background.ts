@@ -266,16 +266,24 @@ async function handleGetPopupData(tabId: number): Promise<any> {
       type: 'FORM_DATA',
       form: null,
       fillPlan: null,
+      vaultItems: {},
     };
   }
 
   // Generate fill plan locally
   const fillPlan = await generateLocalFillPlan(snapshot);
 
+  // Convert vault items to key-value map for preview
+  const vaultMap: Record<string, string> = {};
+  for (const item of cachedVaultItems) {
+    vaultMap[item.key] = item.value;
+  }
+
   return {
     type: 'FORM_DATA',
     form: snapshot,
     fillPlan: fillPlan,
+    vaultItems: vaultMap,
   };
 }
 

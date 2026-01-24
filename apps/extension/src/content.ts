@@ -20,6 +20,14 @@ if (IS_DESKTOP_APP) {
 }
 
 import type { FieldNode, FieldType, FormFingerprint, FormSnapshot, SelectOption, FillCommand } from '@asterisk/core';
+import {
+  inferFieldSemantic,
+  findAllFields,
+  isFieldVisible,
+  generateStableFieldId,
+  detectMultiStepForm,
+  inferFormPurpose,
+} from './content-improvements';
 
 // ============================================================================
 // Constants
@@ -182,16 +190,24 @@ function extractFieldNode(
     }
   }
 
+  // Skip invisible fields
+  if (!isFieldVisible(element)) {
+    return null;
+  }
+
   const fieldType = getFieldType(element);
   const label = findLabelForElement(element);
 
+  // Infer semantic meaning
+  const semantic = inferFieldSemantic(element, label);
+
   // Build base field node - NEVER include currentValue
   const fieldNode: FieldNode = {
-    id: element.id || `field-${index}`,
+    id: generateStableFieldId(element, index),
     name: element.name || '',
     label,
     type: fieldType,
-    semantic: 'unknown', // Will be inferred later by the desktop app
+    semantic, // Now inferred locally!
     required: element.required || element.getAttribute('aria-required') === 'true',
     autocomplete: element.autocomplete || undefined,
     placeholder: 'placeholder' in element ? element.placeholder || undefined : undefined,
@@ -266,8 +282,8 @@ function extractDomain(url: string): string {
 }
 
 async function extractFormSnapshot(form: HTMLFormElement): Promise<FormSnapshot | null> {
-  // Find all form fields
-  const fieldElements = form.querySelectorAll('input, select, textarea');
+  // Find all form fields including Shadow DOM
+  const fieldElements = findAllFields(form as unknown as Document);
   const fields: FieldNode[] = [];
 
   let index = 0;
@@ -314,7 +330,13 @@ async function scanPageForForms(): Promise<FormSnapshot[]> {
   }
 
   // Also check for "implicit forms" - fields not inside a <form> tag
-  const orphanFields = document.querySelectorAll('input:not(form input), select:not(form select), textarea:not(form textarea)');
+  // Now includes Shadow DOM support
+  const allFields = findAllFields();
+  const orphanFields = allFields.filter(el => {
+    if (!isFormField(el)) return false;
+    return !el.closest('form');
+  });
+
   if (orphanFields.length > 0) {
     const fields: FieldNode[] = [];
     let index = 0;
@@ -330,14 +352,31 @@ async function scanPageForForms(): Promise<FormSnapshot[]> {
 
     if (fields.length > 0) {
       const fingerprint = await computeFingerprint(fields);
-      snapshots.push({
+
+      // Detect multi-step forms
+      const multiStepInfo = detectMultiStepForm();
+
+      // Infer form purpose
+      const purpose = inferFormPurpose(fields);
+
+      const snapshot: FormSnapshot = {
         url: window.location.href,
         domain: extractDomain(window.location.href),
         title: document.title,
         capturedAt: new Date().toISOString(),
         fingerprint,
         fields,
+      };
+
+      // Add metadata (if we extend FormSnapshot type in future)
+      console.debug('[Asterisk] Form analysis:', {
+        purpose,
+        multiStep: multiStepInfo.isMultiStep,
+        currentStep: multiStepInfo.currentStep,
+        totalSteps: multiStepInfo.totalSteps,
       });
+
+      snapshots.push(snapshot);
     }
   }
 
