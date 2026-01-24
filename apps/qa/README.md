@@ -39,6 +39,7 @@ python3 native_extension_test.py
 
 | Guide | Purpose |
 |-------|---------|
+| [Test Cases](./docs/TEST-CASES.md) | Complete catalog of all test cases |
 | [Testing Strategy](./docs/TESTING-STRATEGY.md) | When to use each test type |
 | [Adding Tests](./docs/ADDING-TESTS.md) | How to write new test cases |
 | [Troubleshooting](./docs/TROUBLESHOOTING.md) | Common issues and fixes |
