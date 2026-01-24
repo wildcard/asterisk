@@ -27,6 +27,21 @@ const DEFAULT_SETTINGS: Settings = {
   showKeyboardShortcuts: true,
 };
 
+/**
+ * Validates desktop API URL to prevent open redirect attacks
+ * Only allows localhost URLs with http/https protocols
+ */
+function isValidDesktopUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const allowedHosts = ['localhost', '127.0.0.1', '[::1]'];
+    return ['http:', 'https:'].includes(parsed.protocol) &&
+           allowedHosts.includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saving, setSaving] = useState(false);
@@ -56,6 +71,12 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   };
 
   const handleSave = async () => {
+    // Validate desktop URL before saving
+    if (!isValidDesktopUrl(settings.desktopApiUrl)) {
+      alert('Invalid desktop URL. Must be localhost with http:// or https://');
+      return;
+    }
+
     setSaving(true);
     try {
       await chrome.storage.local.set({
@@ -78,6 +99,11 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   };
 
   const handleOpenFullSettings = async () => {
+    // Validate URL before navigation (defense in depth)
+    if (!isValidDesktopUrl(settings.desktopApiUrl)) {
+      alert('Invalid desktop URL configured. Please update settings.');
+      return;
+    }
     await chrome.tabs.create({ url: `${settings.desktopApiUrl}#settings` });
     window.close();
   };

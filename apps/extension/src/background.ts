@@ -29,8 +29,10 @@ const CONNECTION_RETRY_INTERVAL = 5000; // 5 seconds
 // Store latest form snapshots per tab for popup access
 const formSnapshotsByTab = new Map<number, FormSnapshot>();
 
-// Cache vault data for local fill plan generation
+// Cache vault data for local fill plan generation with TTL
 let cachedVaultItems: VaultItem[] = [];
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // ============================================================================
 // Desktop Communication
@@ -40,7 +42,16 @@ let cachedVaultItems: VaultItem[] = [];
  * Fetch vault items from desktop app for local fill plan generation
  */
 async function fetchVaultItems(): Promise<VaultItem[]> {
-  if (!isDesktopAvailable) return cachedVaultItems;
+  // Check cache expiry and clear if expired
+  if (Date.now() - cacheTimestamp > CACHE_TTL_MS) {
+    cachedVaultItems = [];
+    cacheTimestamp = 0;
+  }
+
+  // Return cached items if valid
+  if (cachedVaultItems.length > 0 && !isDesktopAvailable) {
+    return cachedVaultItems;
+  }
 
   try {
     const response = await fetch('http://127.0.0.1:17373/v1/vault', {
@@ -50,6 +61,7 @@ async function fetchVaultItems(): Promise<VaultItem[]> {
     if (response.ok) {
       const items: VaultItem[] = await response.json();
       cachedVaultItems = items;
+      cacheTimestamp = Date.now(); // Update cache timestamp
       isDesktopAvailable = true;
       return items;
     }
@@ -487,3 +499,13 @@ chrome.runtime.onInstalled.addListener(async () => {
     await fetchVaultItems();
   }
 })();
+
+// ============================================================================
+// Security: Clear sensitive cache on extension suspend
+// ============================================================================
+
+chrome.runtime.onSuspend.addListener(() => {
+  console.debug('[Asterisk] Service worker suspending - clearing vault cache');
+  cachedVaultItems = [];
+  cacheTimestamp = 0;
+});

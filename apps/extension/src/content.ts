@@ -107,7 +107,7 @@ function getFieldType(element: HTMLInputElement | HTMLSelectElement | HTMLTextAr
 function findLabelForElement(element: HTMLElement): string {
   // 1. Check for explicit label via 'for' attribute
   if (element.id) {
-    const label = document.querySelector(`label[for="${element.id}"]`);
+    const label = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
     if (label?.textContent) {
       return label.textContent.trim();
     }
@@ -512,7 +512,7 @@ function findFieldElement(fieldId: string): HTMLInputElement | HTMLSelectElement
   }
 
   // Try to find by name attribute
-  element = document.querySelector(`[name="${fieldId}"]`);
+  element = document.querySelector(`[name="${CSS.escape(fieldId)}"]`);
   if (element && isFormField(element)) {
     return element;
   }
@@ -549,7 +549,7 @@ function fillField(element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaE
       if (type === 'radio') {
         // For radio buttons, find the one with matching value
         const name = element.name;
-        const radio = document.querySelector(`input[type="radio"][name="${name}"][value="${value}"]`) as HTMLInputElement;
+        const radio = document.querySelector(`input[type="radio"][name="${CSS.escape(name)}"][value="${CSS.escape(value)}"]`) as HTMLInputElement;
         if (radio) {
           radio.checked = true;
           radio.dispatchEvent(new Event('change', { bubbles: true }));
