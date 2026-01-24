@@ -12,6 +12,8 @@ import { useEffect, useState } from 'react';
 interface Settings {
   desktopApiUrl: string;
   autoFillEnabled: boolean;
+  autoCloseAfterFill: boolean;
+  showKeyboardShortcuts: boolean;
 }
 
 interface SettingsModalProps {
@@ -21,6 +23,8 @@ interface SettingsModalProps {
 const DEFAULT_SETTINGS: Settings = {
   desktopApiUrl: 'http://localhost:1420',
   autoFillEnabled: true,
+  autoCloseAfterFill: true,
+  showKeyboardShortcuts: true,
 };
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
@@ -34,10 +38,17 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
   const loadSettings = async () => {
     try {
-      const result = await chrome.storage.local.get(['desktopApiUrl', 'autoFillEnabled']);
+      const result = await chrome.storage.local.get([
+        'desktopApiUrl',
+        'autoFillEnabled',
+        'autoCloseAfterFill',
+        'showKeyboardShortcuts',
+      ]);
       setSettings({
         desktopApiUrl: result.desktopApiUrl || DEFAULT_SETTINGS.desktopApiUrl,
         autoFillEnabled: result.autoFillEnabled ?? DEFAULT_SETTINGS.autoFillEnabled,
+        autoCloseAfterFill: result.autoCloseAfterFill ?? DEFAULT_SETTINGS.autoCloseAfterFill,
+        showKeyboardShortcuts: result.showKeyboardShortcuts ?? DEFAULT_SETTINGS.showKeyboardShortcuts,
       });
     } catch (error) {
       console.error('[SettingsModal] Failed to load settings:', error);
@@ -50,6 +61,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
       await chrome.storage.local.set({
         desktopApiUrl: settings.desktopApiUrl,
         autoFillEnabled: settings.autoFillEnabled,
+        autoCloseAfterFill: settings.autoCloseAfterFill,
+        showKeyboardShortcuts: settings.showKeyboardShortcuts,
       });
 
       // Close modal after brief delay
@@ -106,6 +119,28 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                 onChange={(e) => setSettings({ ...settings, autoFillEnabled: e.target.checked })}
               />
               <span>Enable automatic form filling</span>
+            </label>
+          </div>
+
+          <div className="form-group">
+            <label className="form-checkbox">
+              <input
+                type="checkbox"
+                checked={settings.autoCloseAfterFill}
+                onChange={(e) => setSettings({ ...settings, autoCloseAfterFill: e.target.checked })}
+              />
+              <span>Auto-close popup after filling</span>
+            </label>
+          </div>
+
+          <div className="form-group">
+            <label className="form-checkbox">
+              <input
+                type="checkbox"
+                checked={settings.showKeyboardShortcuts}
+                onChange={(e) => setSettings({ ...settings, showKeyboardShortcuts: e.target.checked })}
+              />
+              <span>Show keyboard shortcuts hint</span>
             </label>
           </div>
 
