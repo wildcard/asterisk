@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react';
 import type { FormSnapshot, FillPlan } from '@asterisk/core';
 import { SettingsModal } from './SettingsModal';
+import { FieldPreviewList } from './FieldPreviewList';
 
 // ============================================================================
 // Types
@@ -24,11 +25,14 @@ interface PopupState {
   fillPlan: FillPlan | null;
   filling: boolean;
   showSettings: boolean;
+  vaultItems: Map<string, string>;
+  fieldToggles: Record<string, boolean>;
+  showFieldPreview: boolean;
 }
 
 // Message types for background responses
 type BackgroundResponse =
-  | { type: 'FORM_DATA'; form: FormSnapshot | null; fillPlan: FillPlan | null }
+  | { type: 'FORM_DATA'; form: FormSnapshot | null; fillPlan: FillPlan | null; vaultItems: Record<string, string> }
   | { type: 'DESKTOP_STATUS'; connected: boolean }
   | { type: 'FILL_RESULT'; success: boolean; filledCount: number }
   | { type: 'ERROR'; message: string };
@@ -46,6 +50,9 @@ export function Popup() {
     fillPlan: null,
     filling: false,
     showSettings: false,
+    vaultItems: new Map(),
+    fieldToggles: {},
+    showFieldPreview: false,
   });
 
   // Load initial data on mount
@@ -69,11 +76,22 @@ export function Popup() {
       }) as BackgroundResponse;
 
       if (response.type === 'FORM_DATA') {
+        // Initialize field toggles (all enabled by default)
+        const fieldToggles: Record<string, boolean> = {};
+        if (response.fillPlan) {
+          response.fillPlan.recommendations.forEach(rec => {
+            fieldToggles[rec.fieldId] = true;
+          });
+        }
+
         setState(prev => ({
           ...prev,
           loading: false,
           currentForm: response.form,
           fillPlan: response.fillPlan,
+          vaultItems: new Map(Object.entries(response.vaultItems)),
+          fieldToggles,
+          showFieldPreview: false, // collapsed by default
         }));
       } else if (response.type === 'ERROR') {
         setState(prev => ({ ...prev, loading: false, error: response.message }));
@@ -97,15 +115,40 @@ export function Popup() {
     }
   };
 
+  const handleToggleField = (fieldId: string) => {
+    setState(prev => ({
+      ...prev,
+      fieldToggles: {
+        ...prev.fieldToggles,
+        [fieldId]: !prev.fieldToggles[fieldId],
+      },
+    }));
+  };
+
   const handleFillAll = async () => {
     if (!state.fillPlan || !state.currentForm) return;
+
+    // Filter fill plan to only include enabled fields
+    const enabledRecommendations = state.fillPlan.recommendations.filter(
+      rec => state.fieldToggles[rec.fieldId] !== false
+    );
+
+    if (enabledRecommendations.length === 0) {
+      setState(prev => ({ ...prev, error: 'No fields selected for filling' }));
+      return;
+    }
+
+    const filteredFillPlan: FillPlan = {
+      ...state.fillPlan,
+      recommendations: enabledRecommendations,
+    };
 
     setState(prev => ({ ...prev, filling: true, error: null }));
 
     try {
       const response = await chrome.runtime.sendMessage({
         type: 'EXECUTE_FILL',
-        payload: { fillPlan: state.fillPlan, formSnapshot: state.currentForm },
+        payload: { fillPlan: filteredFillPlan, formSnapshot: state.currentForm },
       }) as BackgroundResponse;
 
       if (response.type === 'FILL_RESULT' && response.success) {
@@ -209,6 +252,32 @@ export function Popup() {
                 </div>
               )}
             </div>
+
+            {/* Field Preview Section (collapsible) */}
+            {hasMatches && (
+              <div className="preview-toggle-section">
+                <button
+                  className="preview-toggle-button"
+                  onClick={() => setState(prev => ({ ...prev, showFieldPreview: !prev.showFieldPreview }))}
+                >
+                  <span>{state.showFieldPreview ? '▼' : '▶'}</span>
+                  <span>Preview & Customize Fields</span>
+                  <span className="preview-toggle-count">
+                    {Object.values(state.fieldToggles).filter(Boolean).length} selected
+                  </span>
+                </button>
+
+                {state.showFieldPreview && fillPlan && (
+                  <FieldPreviewList
+                    form={currentForm}
+                    fillPlan={fillPlan}
+                    fieldToggles={state.fieldToggles}
+                    onToggleField={handleToggleField}
+                    vaultItems={state.vaultItems}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="action-section">

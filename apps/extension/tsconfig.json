@@ -19,5 +19,6 @@
     "rootDir": "./src",
     "types": ["chrome"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/__tests__"]
 }
