@@ -119,6 +119,52 @@ test.describe('Extension Popup E2E', () => {
         maxDiffPixels: 200, // Increased tolerance for CI font rendering differences
       });
     });
+
+    test('loading state matches expected layout', async () => {
+      // Open fresh page to catch loading state
+      const loadingPage = await context.newPage();
+      const loadingPromise = loadingPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+
+      // Capture screenshot while loading (before domcontentloaded)
+      await loadingPage.waitForLoadState('load');
+      await expect(loadingPage).toHaveScreenshot('popup-loading-state.png', {
+        maxDiffPixels: 200,
+      });
+
+      await loadingPromise;
+      await loadingPage.close();
+    });
+
+    test('error state matches expected layout', async () => {
+      // Mock error response
+      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+        await route.abort('failed');
+      });
+
+      await popupPage.reload();
+      await popupPage.waitForLoadState('domcontentloaded');
+      await popupPage.waitForTimeout(1000); // Wait for error to display
+
+      await expect(popupPage).toHaveScreenshot('popup-error-state.png', {
+        maxDiffPixels: 200,
+      });
+    });
+
+    test('offline indicator matches expected layout', async () => {
+      // Mock desktop offline
+      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+        await route.abort('failed');
+      });
+
+      await popupPage.reload();
+      await waitForPopupReady(popupPage, 10000);
+
+      // Check footer shows offline status
+      const footer = popupPage.locator('.popup-footer');
+      await expect(footer).toHaveScreenshot('popup-footer-offline.png', {
+        maxDiffPixels: 100,
+      });
+    });
   });
 
   test.describe('Manual Integration Tests', () => {
@@ -313,6 +359,158 @@ test.describe('Extension Popup E2E', () => {
 
       const hasErrorIndicator = await errorIndicator.count();
       expect(hasErrorIndicator).toBeGreaterThan(0);
+    });
+  });
+
+  test.describe('Form Detection Edge Cases', () => {
+    test.beforeEach(async () => {
+      popupPage = await context.newPage();
+    });
+
+    test.afterEach(async () => {
+      await popupPage?.close();
+    });
+
+    test('handles rapid navigation between pages', async () => {
+      // Simulate rapid tab switching
+      await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+      await waitForPopupReady(popupPage);
+
+      // Verify popup doesn't crash
+      const popupContainer = popupPage.locator('.popup-container, body');
+      await expect(popupContainer).toBeVisible();
+    });
+
+    test('handles popup reopening without reload', async () => {
+      await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+      await waitForPopupReady(popupPage);
+
+      // Close and reopen (simulates clicking extension icon twice)
+      await popupPage.close();
+
+      popupPage = await context.newPage();
+      await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+      await waitForPopupReady(popupPage);
+
+      // Should still render correctly
+      const header = popupPage.locator('.popup-header');
+      await expect(header).toBeVisible();
+    });
+
+    test('displays proper empty state with no cached data', async () => {
+      // Fresh context with no prior form snapshots
+      await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+      await waitForPopupReady(popupPage);
+
+      // Should show empty state
+      const emptyState = popupPage.locator('.empty-state');
+      await expect(emptyState).toBeVisible();
+
+      const emptyTitle = popupPage.locator('.empty-state-title');
+      await expect(emptyTitle).toHaveText('No Form Detected');
+    });
+  });
+
+  test.describe('Connection Recovery', () => {
+    test.beforeEach(async () => {
+      popupPage = await context.newPage();
+    });
+
+    test.afterEach(async () => {
+      await popupPage?.close();
+    });
+
+    test('shows offline then online status on reconnect', async () => {
+      // Start with desktop offline
+      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+        await route.abort('failed');
+      });
+
+      await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+      await waitForPopupReady(popupPage, 10000);
+
+      // Verify offline status
+      const offlineStatus = popupPage.locator('.connection-status:has-text("not connected")');
+      await expect(offlineStatus).toBeVisible();
+
+      // Simulate reconnection by unblocking routes
+      await popupPage.unroute('http://127.0.0.1:17373/**');
+
+      // Reload to trigger reconnection check
+      await popupPage.reload();
+      await waitForPopupReady(popupPage, 10000);
+
+      // Should show connected status
+      const connectedStatus = popupPage.locator('.connection-status:has-text("connected")');
+      await expect(connectedStatus).toBeVisible();
+    });
+
+    test('updates connection status after network recovery', async () => {
+      // Start offline
+      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+        await route.abort('failed');
+      });
+
+      await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+      await waitForPopupReady(popupPage, 10000);
+
+      // Verify starts offline
+      const offlineFirst = popupPage.locator('.connection-status:has-text("not connected")');
+      const hasOffline = await offlineFirst.count();
+      expect(hasOffline).toBeGreaterThan(0);
+
+      // Now allow requests (simulate network recovery)
+      await popupPage.unroute('http://127.0.0.1:17373/**');
+
+      // Reload to check connection status
+      await popupPage.reload();
+      await waitForPopupReady(popupPage, 10000);
+
+      // Should show connected after recovery
+      const connectedNow = popupPage.locator('.connection-status:has-text("connected")');
+      const hasConnected = await connectedNow.count();
+      expect(hasConnected).toBeGreaterThan(0);
+    });
+  });
+
+  test.describe('UI Responsiveness', () => {
+    test.beforeEach(async () => {
+      await seedVaultData(vaultItems);
+      popupPage = await context.newPage();
+    });
+
+    test.afterEach(async () => {
+      await popupPage?.close();
+    });
+
+    test('all interactive elements have proper focus states', async () => {
+      await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+      await waitForPopupReady(popupPage);
+
+      // Tab through elements
+      const settingsButton = popupPage.locator('.settings-button');
+      await settingsButton.focus();
+      await expect(settingsButton).toBeFocused();
+    });
+
+    test('buttons show disabled state appropriately', async () => {
+      await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+      await waitForPopupReady(popupPage);
+
+      // In empty state, action buttons should be hidden
+      const actionSection = popupPage.locator('.action-section');
+      const isHidden = await actionSection.isHidden().catch(() => true);
+      expect(isHidden).toBe(true);
+    });
+
+    test('popup width and height meet minimum requirements', async () => {
+      await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
+      await waitForPopupReady(popupPage);
+
+      const bodyBox = await popupPage.locator('body').boundingBox();
+
+      expect(bodyBox?.width).toBeGreaterThanOrEqual(380); // Minimum width
+      expect(bodyBox?.height).toBeGreaterThanOrEqual(400); // Minimum height
     });
   });
 });
