@@ -115,7 +115,7 @@ export function Popup() {
           loading: false,
           currentForm: response.form,
           fillPlan: response.fillPlan,
-          vaultItems: new Map(Object.entries(response.vaultItems)),
+          vaultItems: new Map(Object.entries(response.vaultItems || {})),
           fieldToggles,
           showFieldPreview: false, // collapsed by default
         }));

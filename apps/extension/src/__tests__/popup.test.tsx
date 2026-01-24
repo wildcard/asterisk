@@ -45,15 +45,15 @@ describe('Popup', () => {
   });
 
   describe('Loading State', () => {
-    it('shows loading spinner initially', async () => {
+    it('shows loading skeleton initially', async () => {
       // Mock chrome API to never resolve (keeps loading state)
       chrome.tabs.query = vi.fn(() => new Promise(() => {}));
 
       render(<Popup />);
 
-      expect(screen.getByText('Loading...')).toBeInTheDocument();
-      const spinner = document.querySelector('.spinner');
-      expect(spinner).toBeInTheDocument();
+      // Should show skeleton, not spinner
+      const skeleton = document.querySelector('.skeleton-container');
+      expect(skeleton).toBeInTheDocument();
     });
   });
 

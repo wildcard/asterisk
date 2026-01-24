@@ -17,8 +17,8 @@ const chromeMock = {
   },
   storage: {
     local: {
-      get: vi.fn(),
-      set: vi.fn(),
+      get: vi.fn().mockResolvedValue({}), // Return empty object by default
+      set: vi.fn().mockResolvedValue(undefined),
     },
   },
 };
@@ -29,4 +29,7 @@ global.chrome = chromeMock;
 // Reset mocks before each test
 beforeEach(() => {
   vi.clearAllMocks();
+  // Re-apply default mock behaviors after clear
+  chrome.storage.local.get = vi.fn().mockResolvedValue({});
+  chrome.storage.local.set = vi.fn().mockResolvedValue(undefined);
 });
