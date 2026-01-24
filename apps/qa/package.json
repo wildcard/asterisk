@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "setup": "./scripts/setup-test-form.sh",
+    "serve": "./scripts/start-test-server.sh",
     "test": "playwright test",
     "test:desktop": "playwright test --project=desktop-app",
     "test:extension": "playwright test --project=extension-popup",

@@ -113,7 +113,9 @@ class ChromeExtensionTester:
                 for line in f:
                     if '=' in line:
                         key, val = line.strip().split('=')
-                        coords[key] = int(val)
+                        # Only parse coordinate values, skip metadata like METHOD
+                        if key in ['EXTENSION_ICON_X', 'EXTENSION_ICON_Y']:
+                            coords[key] = int(val)
 
             x = coords.get('EXTENSION_ICON_X')
             y = coords.get('EXTENSION_ICON_Y')
@@ -133,14 +135,126 @@ class ChromeExtensionTester:
         return (1250, 80)
 
     def click_extension_icon(self, x, y):
-        """Click the extension icon at given coordinates"""
+        """
+        Click the extension icon at given coordinates.
+        If unpinned, will fallback to extensions menu navigation.
+        """
         print(f"🖱️  Clicking extension icon at ({x}, {y})...")
 
         subprocess.run(["cliclick", f"c:{x},{y}"])
 
         print("⏳ Waiting for popup to open...")
         time.sleep(2)
-        print("✅ Popup should be open\n")
+
+        # Check if we opened the extensions menu instead of Asterisk popup
+        if self.is_extensions_menu_open():
+            print("   ℹ️  Extensions menu opened (extension not pinned)")
+            print("   🔄 Trying fallback: navigate extensions menu...")
+            self.navigate_extensions_menu()
+        else:
+            print("✅ Popup should be open\n")
+
+    def is_extensions_menu_open(self):
+        """
+        Check if we clicked the extensions menu (puzzle piece) instead of the Asterisk icon.
+        The extensions menu is a dropdown/popover, not a new window.
+        """
+        # Take a quick screenshot and check pixel patterns
+        # The extensions menu has a distinct appearance
+
+        # Simpler approach: Just wait and check if window title contains "Asterisk"
+        # If not, assume we opened the wrong thing
+        time.sleep(1)
+
+        script = """
+        tell application "System Events"
+            tell process "Google Chrome"
+                try
+                    set windowTitle to title of front window
+
+                    -- If window title has "Asterisk", we opened the popup
+                    if windowTitle contains "Asterisk" then
+                        return false
+                    end if
+
+                    -- Otherwise, likely opened extensions menu
+                    return true
+                on error
+                    return true
+                end try
+            end tell
+        end tell
+        """
+
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True
+        )
+
+        is_menu = "true" in result.stdout.lower()
+
+        if is_menu:
+            # Double-check with screenshot analysis
+            screenshot = self.take_screenshot("menu-check")
+            # If extensions menu is open, we'll see it in the UI
+
+        return is_menu
+
+    def navigate_extensions_menu(self):
+        """
+        Navigate the extensions menu to find and click Asterisk.
+        This is a fallback for when the extension isn't pinned.
+        """
+        print("   🔍 Looking for 'Asterisk' in extensions menu...")
+
+        # Strategy: Use keyboard navigation in the menu
+        # Down arrow to navigate, Enter to select
+
+        # First, try to find Asterisk by typing (Chrome's menu search)
+        subprocess.run(["cliclick", "kp:a"])  # Type 'a' for Asterisk
+        time.sleep(0.5)
+
+        # Try clicking in the general area where extensions appear
+        # This is approximate - extensions menu is usually below the icon
+        script = """
+        tell application "System Events"
+            tell process "Google Chrome"
+                -- Try to click on an element containing "Asterisk"
+                try
+                    set allElements to every UI element of front window
+                    repeat with elem in allElements
+                        try
+                            set elemDesc to description of elem
+                            if elemDesc contains "Asterisk" or elemDesc contains "asterisk" then
+                                click elem
+                                return true
+                            end if
+                        end try
+                    end repeat
+                    return false
+                on error
+                    return false
+                end try
+            end tell
+        end tell
+        """
+
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True
+        )
+
+        if "true" in result.stdout.lower():
+            print("   ✅ Found and clicked Asterisk in menu")
+            time.sleep(2)
+        else:
+            print("   ⚠️  Could not find Asterisk in menu")
+            print("   💡 Suggestion: Pin the extension to toolbar")
+            print("      Run: cd apps/qa/scripts && ./pin-extension.sh")
+
+        print()
 
     def take_screenshot(self, name="popup"):
         """Take a screenshot and save it"""

@@ -42,6 +42,8 @@ python3 native_extension_test.py
 | [Testing Strategy](./docs/TESTING-STRATEGY.md) | When to use each test type |
 | [Adding Tests](./docs/ADDING-TESTS.md) | How to write new test cases |
 | [Troubleshooting](./docs/TROUBLESHOOTING.md) | Common issues and fixes |
+| [Calibration Guide](./docs/CALIBRATION-GUIDE.md) | Extension icon coordinate calibration |
+| [Unpinned Extensions](./docs/UNPINNED-EXTENSION-HANDLING.md) | Automated pinning and fallback navigation |
 | [Extension Testing](./EXTENSION-TESTING-GUIDE.md) | Deep dive on Playwright limitations |
 | [Native Testing](./NATIVE-EXTENSION-TESTING.md) | macOS automation setup |
 
@@ -76,24 +78,32 @@ pnpm test:extension --update-snapshots
 ```bash
 cd scripts
 
-# First time: calibrate extension icon location
+# First time: pin the extension (recommended)
+./pin-extension.sh
+
+# Calibrate extension icon location
+# (requires test server running - see below)
 ./calibrate_extension_icon.sh
 
 # Run native tests
 python3 native_extension_test.py
 ```
 
-### LLM Matching Tests
+**Note:** Tests now automatically handle unpinned extensions via extensions menu fallback, but pinning provides better reliability.
+
+### Test Server Commands
 
 ```bash
-# Requires Claude API key
-export CLAUDE_API_KEY="sk-ant-..."
+# Start HTTP server for calibration (port 8765)
+# Required for native automation and calibration scripts
+pnpm serve
 
-# Setup + run
-pnpm test:full
-
-# Setup only (start test server)
+# Setup desktop app integration (port 17373)
+# Posts test data to HTTP bridge for Playwright tests
 pnpm setup
+
+# Full test run (setup + Playwright)
+pnpm test:full
 ```
 
 ---

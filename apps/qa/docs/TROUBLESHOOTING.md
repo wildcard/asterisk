@@ -218,12 +218,14 @@ curl http://127.0.0.1:8765/test-llm-form.html
 2. **Start test form server:**
 ```bash
 cd apps/qa
-pnpm setup
+pnpm serve
 
-# Or manually
+# Or manually (runs Python HTTP server on port 8765)
 cd scripts
-./setup-test-form.sh
+./start-test-server.sh
 ```
+
+**Note:** `pnpm setup` is different - it posts to the desktop app bridge (port 17373) for Playwright tests, not the calibration server.
 
 ---
 
