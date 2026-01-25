@@ -137,11 +137,25 @@ function FieldPreviewItem({ preview, onToggle }: FieldPreviewItemProps) {
 
 /**
  * Mask sensitive field values for preview
+ *
+ * Security: Expanded sensitive field list based on security audit
  */
 function maskSensitiveValue(field: FieldNode, value: string): string {
-  const sensitiveTypes: string[] = ['password', 'creditCard', 'cvv', 'ssn'];
+  const sensitiveSemantics = new Set([
+    'password',
+    'creditCard',
+    'cvv',
+    'ssn',
+    'dateOfBirth',
+    'securityAnswer',
+    'pin',
+    'accountNumber',
+    'routingNumber',
+    'bankAccount',
+    'taxId',
+  ]);
 
-  if (field.type === 'password' || sensitiveTypes.includes(field.semantic)) {
+  if (field.type === 'password' || sensitiveSemantics.has(field.semantic)) {
     return '••••••••';
   }
 

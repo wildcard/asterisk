@@ -377,6 +377,12 @@ async function handleExecuteFill(fillPlan: FillPlan, formSnapshot: FormSnapshot)
 // ============================================================================
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Security: Verify message comes from our extension
+  if (sender.id && sender.id !== chrome.runtime.id) {
+    console.warn('[Asterisk] Rejecting message from unknown sender:', sender.id);
+    return false;
+  }
+
   // Handle form snapshots from content scripts
   if (message.type === DESKTOP_BRIDGE_MESSAGE && message.payload) {
     const snapshot = message.payload as FormSnapshot;
