@@ -48,3 +48,13 @@ export {
   getMatchTierDescription,
   getConfidenceLevel,
 } from './matching';
+
+// Export performance monitoring
+export type {
+  PerformanceMetric,
+  PerformanceStats,
+  LLMMetrics,
+  MatchingMetrics,
+} from './performance';
+
+export { PerformanceMonitor, performanceMonitor } from './performance';
