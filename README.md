@@ -97,9 +97,11 @@ pnpm build
 
 ## Documentation
 
-- [Architecture Overview](./docs/architecture.md)
+- [Architecture](./ARCHITECTURE.md) - System architecture, data flow, and technical design
+- [Security](./SECURITY.md) - Security architecture, threat model, and audit history
 - [Data Separation Design](./docs/data-separation.md)
 - [Threat Model](./docs/threat-model.md)
+- [Architecture Overview](./docs/architecture.md)
 
 ## Features
 
@@ -131,6 +133,27 @@ pnpm build
 - Category-based organization (identity, contact, address, financial, custom)
 - Usage statistics and metadata
 
+## Security
+
+Asterisk implements multiple layers of security to protect your sensitive data:
+
+### Extension Security
+- **Content Security Policy (CSP)**: Prevents XSS and code injection attacks
+- **Message Sender Verification**: Blocks cross-extension attacks
+- **Sensitive Data Masking**: 11 field types masked in UI (passwords, credit cards, SSN, etc.)
+- **Vault Cache TTL**: 5-minute ephemeral cache (memory-only, cleared on suspend)
+
+### Desktop App Security
+- **Encrypted Vault Storage**: AES-256-GCM with OS keychain
+- **Localhost-Only API**: Desktop HTTP bridge only accessible from localhost
+- **Audit Logging**: Append-only audit trail with PII redaction
+
+### Test Coverage
+- **91 Unit Tests**: Security-focused tests for CSP, sender verification, masking, cache TTL
+- **7 E2E Tests**: Integration tests for form detection, filling, error handling
+
+For complete security documentation, see [SECURITY.md](./SECURITY.md)
+
 ## Current Status
 
 **Phase 2: Trust & UX** (Completed)
@@ -143,6 +166,8 @@ pnpm build
 - ✅ Fill plan review dialog with confidence gating
 - ✅ Audit logging with PII redaction
 - ✅ Undo functionality
+- ✅ Security hardening (CSP, sender verification, data masking)
+- ✅ Comprehensive test suite (91 unit tests, 7 E2E tests)
 
 **Next Phase: Enhancement**
 - 🚧 LLM-powered matching for unmatched fields
