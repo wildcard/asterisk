@@ -45,6 +45,7 @@ function isValidDesktopUrl(url: string): boolean {
 export function SettingsModal({ onClose }: SettingsModalProps) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Load settings on mount
   useEffect(() => {
@@ -71,9 +72,12 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   };
 
   const handleSave = async () => {
+    // Clear previous errors
+    setError(null);
+
     // Validate desktop URL before saving
     if (!isValidDesktopUrl(settings.desktopApiUrl)) {
-      alert('Invalid desktop URL. Must be localhost with http:// or https://');
+      setError('Invalid desktop URL. Must be localhost with http:// or https://');
       return;
     }
 
@@ -92,7 +96,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
       }, 300);
     } catch (error) {
       console.error('[SettingsModal] Failed to save settings:', error);
-      alert('Failed to save settings');
+      setError('Failed to save settings. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -101,7 +105,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const handleOpenFullSettings = async () => {
     // Validate URL before navigation (defense in depth)
     if (!isValidDesktopUrl(settings.desktopApiUrl)) {
-      alert('Invalid desktop URL configured. Please update settings.');
+      setError('Invalid desktop URL configured. Please update settings.');
       return;
     }
     await chrome.tabs.create({ url: `${settings.desktopApiUrl}#settings` });
@@ -126,6 +130,12 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         </div>
 
         <div className="modal-body">
+          {error && (
+            <div className="error-message" style={{ marginBottom: '16px' }}>
+              {error}
+            </div>
+          )}
+
           <div className="form-group">
             <label className="form-label">Desktop API URL</label>
             <input
