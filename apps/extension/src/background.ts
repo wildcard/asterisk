@@ -91,8 +91,9 @@ async function fetchVaultItems(): Promise<VaultItem[]> {
     // HTTP error response - mark desktop as unavailable
     isDesktopAvailable = false;
     return cachedVaultItems;
-  } catch {
-    // Network error - mark desktop as unavailable
+  } catch (error) {
+    // Expected: Network error when desktop app not running
+    console.debug('[Asterisk] Vault fetch failed:', error instanceof Error ? error.message : 'Network error');
     isDesktopAvailable = false;
     return cachedVaultItems;
   }
@@ -146,9 +147,9 @@ async function sendToDesktop(snapshot: FormSnapshot): Promise<boolean> {
     // Server returned an error
     console.debug('[Asterisk] Desktop returned error:', response.status);
     return false;
-  } catch {
-    // Connection failed - desktop probably not running
-    // Silently fail without spamming console
+  } catch (error) {
+    // Expected: Connection failed when desktop app not running
+    console.debug('[Asterisk] Desktop connection failed:', error instanceof Error ? error.message : 'Network error');
     isDesktopAvailable = false;
     return false;
   }
@@ -165,7 +166,9 @@ async function checkDesktopHealth(): Promise<boolean> {
     });
     isDesktopAvailable = response.ok;
     return response.ok;
-  } catch {
+  } catch (error) {
+    // Expected: Health check failed when desktop app not running
+    console.debug('[Asterisk] Health check failed:', error instanceof Error ? error.message : 'Network error');
     isDesktopAvailable = false;
     return false;
   }
@@ -210,8 +213,9 @@ async function pollFillCommands(): Promise<void> {
         console.debug('[Asterisk] Fill command executed:', command.id, command.fills.length, 'fields');
       }
     }
-  } catch {
-    // Silently fail - desktop may not be running
+  } catch (error) {
+    // Expected: Poll failed when desktop app not running
+    console.debug('[Asterisk] Fill command poll failed:', error instanceof Error ? error.message : 'Network error');
   }
 }
 
@@ -258,8 +262,9 @@ async function acknowledgeFillCommand(commandId: string): Promise<void> {
     await fetch(`${FILL_COMMANDS_URL}?id=${encodeURIComponent(commandId)}`, {
       method: 'DELETE',
     });
-  } catch {
-    // Silently fail
+  } catch (error) {
+    // Expected: Acknowledge failed when desktop app disconnected
+    console.debug('[Asterisk] Fill command acknowledgement failed:', error instanceof Error ? error.message : 'Network error');
   }
 }
 

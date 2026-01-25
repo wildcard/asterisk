@@ -37,7 +37,9 @@ function isValidDesktopUrl(url: string): boolean {
     const allowedHosts = ['localhost', '127.0.0.1', '[::1]'];
     return ['http:', 'https:'].includes(parsed.protocol) &&
            allowedHosts.includes(parsed.hostname);
-  } catch {
+  } catch (error) {
+    // Expected: Invalid URL format during user input validation
+    console.debug('[Asterisk] URL validation failed:', error instanceof Error ? error.message : 'Invalid URL');
     return false;
   }
 }
