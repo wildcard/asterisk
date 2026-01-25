@@ -47,6 +47,14 @@ export default defineConfig({
       },
       testMatch: /extension-popup\.spec\.ts/,
     },
+    {
+      name: 'form-filling',
+      use: {
+        ...devices['Desktop Chrome'],
+        headless: false, // Required for Chrome extensions
+      },
+      testMatch: /form-filling-integration\.spec\.ts/,
+    },
   ],
 
   // Webserver configuration - start the Tauri dev server if not running
