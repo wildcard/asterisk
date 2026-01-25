@@ -21,21 +21,27 @@ const mockFormSnapshot: FormSnapshot = {
 };
 
 const mockFillPlan: FillPlan = {
-  formHash: 'mock-hash',
+  formFingerprint: 'mock-hash',
+  formId: 'test-form',
   recommendations: [
     {
       fieldId: 'field1',
-      dataKey: 'firstName',
+      vaultKey: 'firstName',
       confidence: 0.9,
       reason: 'Label match',
+      required: false,
+      matchTier: 'semantic',
     },
     {
       fieldId: 'field2',
-      dataKey: 'lastName',
+      vaultKey: 'lastName',
       confidence: 0.8,
       reason: 'Name pattern',
+      required: false,
+      matchTier: 'semantic',
     },
   ],
+  unmatchedFields: ['field3'],
 };
 
 describe('Popup', () => {
@@ -171,7 +177,12 @@ describe('Popup', () => {
         .mockResolvedValueOnce({
           type: 'FORM_DATA',
           form: mockFormSnapshot,
-          fillPlan: { formHash: 'mock-hash', recommendations: [] },
+          fillPlan: {
+            formFingerprint: 'mock-hash',
+            formId: 'test-form',
+            recommendations: [],
+            unmatchedFields: ['field1', 'field2', 'field3'],
+          },
         })
         .mockResolvedValueOnce({ type: 'DESKTOP_STATUS', connected: true });
 

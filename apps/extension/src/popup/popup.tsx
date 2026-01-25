@@ -8,7 +8,7 @@
  * - Open desktop app for detailed review
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import type { FormSnapshot, FillPlan } from '@asterisk/core';
 import { SettingsModal } from './SettingsModal';
 import { FieldPreviewList } from './FieldPreviewList';
@@ -63,6 +63,18 @@ export function Popup() {
     autoCloseAfterFill: true,
     showKeyboardShortcuts: true,
   });
+
+  // Ref to track auto-close timeout for cleanup
+  const autoCloseTimeoutRef = useRef<number | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoCloseTimeoutRef.current) {
+        clearTimeout(autoCloseTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Load initial data and settings on mount
   useEffect(() => {
@@ -190,7 +202,7 @@ export function Popup() {
 
         // Close popup after delay if setting enabled
         if (state.autoCloseAfterFill) {
-          setTimeout(() => window.close(), 1500);
+          autoCloseTimeoutRef.current = window.setTimeout(() => window.close(), 1500);
         }
       } else if (response.type === 'ERROR') {
         setState(prev => ({
@@ -208,17 +220,6 @@ export function Popup() {
       }));
     }
   };
-
-  // Keyboard shortcuts
-  useKeyboardShortcuts({
-    onEscape: () => window.close(),
-    onEnter: () => {
-      if (hasMatches && !filling) {
-        handleFillAll();
-      }
-    },
-    enabled: state.showKeyboardShortcuts,
-  });
 
   const handleOpenDesktop = async () => {
     if (!state.desktopConnected) {
@@ -243,6 +244,20 @@ export function Popup() {
   const matchedCount = fillPlan?.recommendations.filter(r => r.confidence > 0).length ?? 0;
   const unmatchedCount = (currentForm?.fingerprint.fieldCount ?? 0) - matchedCount;
   const hasMatches = matchedCount > 0;
+
+  // Keyboard shortcuts (memoized to prevent unnecessary effect re-runs)
+  const handleEscape = useCallback(() => window.close(), []);
+  const handleEnter = useCallback(() => {
+    if (hasMatches && !filling) {
+      handleFillAll();
+    }
+  }, [hasMatches, filling]);
+
+  useKeyboardShortcuts({
+    onEscape: handleEscape,
+    onEnter: handleEnter,
+    enabled: state.showKeyboardShortcuts,
+  });
 
   return (
     <>
