@@ -53,7 +53,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         headless: false, // Required for Chrome extensions
       },
-      testMatch: /form-filling-integration\.spec\.ts/,
+      testMatch: /(form-filling-integration|real-world-forms)\.spec\.ts/,
     },
   ],
 
