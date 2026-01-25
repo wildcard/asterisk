@@ -276,7 +276,9 @@ function extractDomain(url: string): string {
   try {
     const urlObj = new URL(url);
     return urlObj.hostname;
-  } catch {
+  } catch (error) {
+    // Expected: Invalid URL format (e.g., relative URLs, malformed URLs)
+    console.debug('[Asterisk] Domain extraction failed:', error instanceof Error ? error.message : 'Invalid URL');
     return '';
   }
 }
