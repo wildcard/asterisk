@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  matchByAutocomplete,
-  matchByPattern,
-  generateFillPlan,
-  type VaultItem,
-  type FieldNode,
-} from '../matching';
+import { matchByAutocomplete, matchByPattern, generateFillPlan } from '../matching';
+import type { VaultItem, FieldNode, FormSnapshot } from '../types';
 
 describe('matchByAutocomplete', () => {
   const vaultItems: VaultItem[] = [
@@ -274,7 +269,7 @@ describe('generateFillPlan', () => {
   ];
 
   it('should generate fill plan with mixed tier matches', () => {
-    const formSnapshot = {
+    const formSnapshot: FormSnapshot = {
       url: 'https://example.com/form',
       title: 'Test Form',
       domain: 'example.com',
@@ -332,7 +327,7 @@ describe('generateFillPlan', () => {
   });
 
   it('should handle form with no matches', () => {
-    const formSnapshot = {
+    const formSnapshot: FormSnapshot = {
       url: 'https://example.com/form',
       title: 'Test Form',
       domain: 'example.com',

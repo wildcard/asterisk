@@ -196,8 +196,9 @@ export class PerformanceMonitor {
       count: durations.length,
       totalDuration,
       averageDuration: totalDuration / durations.length,
-      minDuration: durations[0],
-      maxDuration: durations[durations.length - 1],
+      // Safe: `durations` is non-empty here (guarded by the length check above).
+      minDuration: durations[0]!,
+      maxDuration: durations[durations.length - 1]!,
       p50Duration: this.percentile(durations, 50),
       p95Duration: this.percentile(durations, 95),
       p99Duration: this.percentile(durations, 99),
@@ -306,7 +307,7 @@ export class PerformanceMonitor {
 
   // Private helpers
 
-  private updateAggregates(metric: PerformanceMetric): void {
+  private updateAggregates(_metric: PerformanceMetric): void {
     // This is called after each metric is recorded
     // Currently we recalculate stats on demand in getStats()
     // Could optimize by maintaining running aggregates here
@@ -320,7 +321,9 @@ export class PerformanceMonitor {
     const upper = Math.ceil(index);
     const weight = index - lower;
 
-    return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
+    // Safe: `lower`/`upper` are derived from `index` which is always within
+    // [0, sortedValues.length - 1] given the non-empty check above.
+    return sortedValues[lower]! * (1 - weight) + sortedValues[upper]! * weight;
   }
 }
 
