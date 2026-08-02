@@ -12,6 +12,7 @@ export type {
   // Vault
   VaultItem,
   VaultCategory,
+  ConfirmationGate,
   // Form Analysis
   FormBrief,
   FieldNode,
@@ -58,3 +59,14 @@ export type {
 } from './performance';
 
 export { PerformanceMonitor, performanceMonitor } from './performance';
+
+// Export DS-160 acceptance workflow (exact field mapping + confirmation gate)
+export {
+  DS160_FIELD_MAP,
+  mapDs160Field,
+  generateDs160FillPlan,
+  isGated,
+  loadDs160FormStructureFixture,
+  loadDs160VaultExampleFixture,
+} from './ds160';
+export type { Ds160FieldMapping, Ds160Section } from './ds160';

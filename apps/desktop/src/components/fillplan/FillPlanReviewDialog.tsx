@@ -103,7 +103,7 @@ export function FillPlanReviewDialog({
       // Set default selections based on disposition
       const initial = new Map<string, boolean>();
       for (const rec of fillPlan.recommendations) {
-        const disposition = getDisposition(rec.confidence);
+        const disposition = getDisposition(rec.confidence, rec.requiresConfirmation);
         // Safe and review are checked by default, blocked is unchecked
         initial.set(rec.fieldId, disposition !== 'blocked');
       }
@@ -119,7 +119,7 @@ export function FillPlanReviewDialog({
       const fieldInfo = fieldInfoMap.get(rec.fieldId);
       const vaultItem = vaultItemMap.get(rec.vaultKey);
       const label = fieldInfo?.label || rec.fieldId;
-      const disposition = getDisposition(rec.confidence);
+      const disposition = getDisposition(rec.confidence, rec.requiresConfirmation);
       const sensitive = isSensitiveField(label);
 
       return {
@@ -213,6 +213,9 @@ export function FillPlanReviewDialog({
           newValueRedacted: newRedacted,
           redaction: row.isSensitive ? 'masked' : (oldLevel === 'partial' || newLevel === 'partial' ? 'partial' : 'none'),
           userConfirmed: row.disposition !== 'safe' && isApplied,
+          ...(row.recommendation.requiresConfirmation
+            ? { notes: `Gated pending confirmation: ${row.recommendation.confirmationReason ?? 'reason not recorded'}` }
+            : {}),
         };
       });
 

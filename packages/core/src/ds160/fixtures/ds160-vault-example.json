@@ -1,0 +1,119 @@
+[
+  {
+    "key": "firstName",
+    "value": "Alex",
+    "label": "First Name",
+    "category": "identity",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
+  },
+  {
+    "key": "lastName",
+    "value": "Example",
+    "label": "Last Name",
+    "category": "identity",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
+  },
+  {
+    "key": "email",
+    "value": "alex@example.test",
+    "label": "Email Address",
+    "category": "contact",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
+  },
+  {
+    "key": "phone",
+    "value": "+1-555-0100",
+    "label": "Phone Number",
+    "category": "contact",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
+  },
+  {
+    "key": "country",
+    "value": "CAN",
+    "label": "Country",
+    "category": "address",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
+  },
+  {
+    "key": "jobTitle",
+    "value": "Self-Employed",
+    "label": "Present Occupation",
+    "category": "identity",
+    "provenance": {
+      "source": "imported",
+      "timestamp": "2026-06-01T00:00:00Z",
+      "confidence": 0.55,
+      "origin": "immigration-prep-snapshot-2026-06"
+    },
+    "metadata": {
+      "created": "2026-06-01T00:00:00Z",
+      "updated": "2026-06-01T00:00:00Z"
+    },
+    "confirmationGate": {
+      "reason": "Occupation is derived from a single prior immigration-prep snapshot and has not been reconfirmed as current. Confirm with the applicant before use.",
+      "evidenceDate": "2026-06-01",
+      "status": "pending_confirmation"
+    }
+  },
+  {
+    "key": "company",
+    "value": "Example Holdings LLC",
+    "label": "Present Employer or Business Name",
+    "category": "identity",
+    "provenance": {
+      "source": "imported",
+      "timestamp": "2026-06-01T00:00:00Z",
+      "confidence": 0.55,
+      "origin": "immigration-prep-snapshot-2026-06"
+    },
+    "metadata": {
+      "created": "2026-06-01T00:00:00Z",
+      "updated": "2026-06-01T00:00:00Z"
+    },
+    "confirmationGate": {
+      "reason": "Employer is derived from a single prior immigration-prep snapshot and has not been reconfirmed as current. Confirm with the applicant before use.",
+      "evidenceDate": "2026-06-01",
+      "status": "pending_confirmation"
+    }
+  }
+]

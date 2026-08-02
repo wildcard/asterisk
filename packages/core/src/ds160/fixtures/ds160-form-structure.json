@@ -1,0 +1,88 @@
+{
+  "url": "https://ceac.state.gov/genniv/",
+  "domain": "ceac.state.gov",
+  "title": "DS-160: Online Nonimmigrant Visa Application",
+  "capturedAt": "2026-08-02T00:00:00Z",
+  "fingerprint": {
+    "fieldCount": 8,
+    "fieldTypes": ["date", "email", "select", "tel", "text"],
+    "requiredCount": 8,
+    "hash": "ds160-personal-address-employment-v1"
+  },
+  "fields": [
+    {
+      "id": "ds160_personal_surname",
+      "name": "surname",
+      "label": "Surname (exactly as it appears in your passport)",
+      "type": "text",
+      "semantic": "lastName",
+      "required": true,
+      "maxLength": 33
+    },
+    {
+      "id": "ds160_personal_given_names",
+      "name": "given_names",
+      "label": "Given Names (exactly as it appears in your passport)",
+      "type": "text",
+      "semantic": "firstName",
+      "required": true,
+      "maxLength": 33
+    },
+    {
+      "id": "ds160_personal_dob",
+      "name": "date_of_birth",
+      "label": "Date of Birth",
+      "type": "date",
+      "semantic": "dateOfBirth",
+      "required": true
+    },
+    {
+      "id": "ds160_contact_email",
+      "name": "email_address",
+      "label": "E-Mail Address",
+      "type": "email",
+      "semantic": "email",
+      "required": true,
+      "autocomplete": "email"
+    },
+    {
+      "id": "ds160_contact_phone_primary",
+      "name": "phone_primary",
+      "label": "Primary Phone Number",
+      "type": "tel",
+      "semantic": "phone",
+      "required": true,
+      "autocomplete": "tel"
+    },
+    {
+      "id": "ds160_home_country",
+      "name": "home_country",
+      "label": "Home Address - Country/Region",
+      "type": "select",
+      "semantic": "country",
+      "required": true,
+      "options": [
+        { "value": "CAN", "label": "CANADA" },
+        { "value": "USA", "label": "UNITED STATES OF AMERICA" }
+      ]
+    },
+    {
+      "id": "ds160_present_occupation",
+      "name": "present_occupation",
+      "label": "Present Occupation",
+      "type": "text",
+      "semantic": "jobTitle",
+      "required": true,
+      "maxLength": 40
+    },
+    {
+      "id": "ds160_present_employer_name",
+      "name": "present_employer_name",
+      "label": "Present Employer or Business Name",
+      "type": "text",
+      "semantic": "company",
+      "required": true,
+      "maxLength": 33
+    }
+  ]
+}

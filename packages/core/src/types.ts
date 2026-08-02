@@ -26,6 +26,27 @@ export interface Provenance {
   origin?: string;
 }
 
+/**
+ * A vault item gated pending explicit user confirmation.
+ *
+ * Used when a candidate value is derived from evidence that is stale,
+ * single-sourced, or otherwise unverified as currently accurate (e.g. an
+ * employer fact pulled from a months-old snapshot). While a gate is present
+ * with status 'pending_confirmation', matching logic must surface the item
+ * as requiring explicit review and must never let it be silently auto-applied,
+ * regardless of match confidence.
+ */
+export interface ConfirmationGate {
+  /** Human-readable reason this value is gated */
+  reason: string;
+
+  /** ISO 8601 date of the evidence the candidate value is based on */
+  evidenceDate: string;
+
+  /** Gate status - currently only one state, extensible for future workflow */
+  status: 'pending_confirmation';
+}
+
 // ============================================================================
 // Vault - User data storage
 // ============================================================================
@@ -56,6 +77,12 @@ export interface VaultItem {
     lastUsed?: Date;
     usageCount?: number;
   };
+
+  /**
+   * Present when this item is a candidate value pending explicit user
+   * confirmation (see {@link ConfirmationGate}). Absent for confirmed data.
+   */
+  confirmationGate?: ConfirmationGate;
 }
 
 // ============================================================================
@@ -269,6 +296,16 @@ export interface FillRecommendation {
 
   /** How the match was determined */
   matchTier: MatchTier;
+
+  /**
+   * True when the source vault item carries a {@link ConfirmationGate}.
+   * Consumers (review UI) must treat this as blocked regardless of
+   * `confidence` and require explicit user confirmation before apply.
+   */
+  requiresConfirmation?: boolean;
+
+  /** Human-readable reason, copied from the vault item's ConfirmationGate */
+  confirmationReason?: string;
 }
 
 /**

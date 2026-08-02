@@ -20,9 +20,17 @@ export type Disposition = 'safe' | 'review' | 'blocked';
  * Determine the disposition of a field based on its confidence score.
  *
  * @param confidence - Confidence score between 0 and 1
+ * @param requiresConfirmation - True when the recommendation's source vault
+ *   item carries a `ConfirmationGate` (e.g. `FillRecommendation.requiresConfirmation`).
+ *   Gated fields are always `blocked`, regardless of confidence - they must
+ *   never be silently auto-applied.
  * @returns The disposition category
  */
-export const getDisposition = (confidence: number): Disposition => {
+export const getDisposition = (
+  confidence: number,
+  requiresConfirmation = false
+): Disposition => {
+  if (requiresConfirmation) return 'blocked';
   if (confidence >= SAFE_AUTO_THRESHOLD) return 'safe';
   if (confidence >= REVIEW_THRESHOLD) return 'review';
   return 'blocked';
