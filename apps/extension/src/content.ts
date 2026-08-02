@@ -27,6 +27,7 @@ import {
   generateStableFieldId,
   detectMultiStepForm,
   inferFormPurpose,
+  buildRadioGroupFieldNode,
 } from './content-improvements';
 
 // ============================================================================
@@ -242,6 +243,49 @@ function extractFieldNode(
   return fieldNode;
 }
 
+/**
+ * Extract FieldNodes from a flat list of form elements, merging same-name
+ * radio buttons into a single logical field instead of one field per
+ * physical radio input (see `buildRadioGroupFieldNode`'s doc comment for
+ * why - it matters a great deal for forms with many Yes/No-style
+ * questions). Shared by both call sites that previously duplicated this
+ * loop (`extractFormSnapshot` and `scanPageForForms`'s orphan-field
+ * branch), so the grouping fix applies to both automatically.
+ */
+function extractFieldsFromElements(elements: Element[]): FieldNode[] {
+  const fields: FieldNode[] = [];
+  const seenRadioGroupNames = new Set<string>();
+  let index = 0;
+
+  for (const el of elements) {
+    if (!isFormField(el)) continue;
+
+    if (isInputElement(el) && el.type.toLowerCase() === 'radio' && el.name) {
+      if (seenRadioGroupNames.has(el.name)) continue;
+      seenRadioGroupNames.add(el.name);
+
+      const radios = elements.filter(
+        (e): e is HTMLInputElement =>
+          isInputElement(e) && e.type.toLowerCase() === 'radio' && e.name === el.name
+      );
+      const fieldNode = buildRadioGroupFieldNode(radios);
+      if (fieldNode) {
+        fields.push(fieldNode);
+        index++;
+      }
+      continue;
+    }
+
+    const fieldNode = extractFieldNode(el, index);
+    if (fieldNode) {
+      fields.push(fieldNode);
+      index++;
+    }
+  }
+
+  return fields;
+}
+
 // ============================================================================
 // Form Snapshot Creation
 // ============================================================================
@@ -286,18 +330,7 @@ function extractDomain(url: string): string {
 async function extractFormSnapshot(form: HTMLFormElement): Promise<FormSnapshot | null> {
   // Find all form fields including Shadow DOM
   const fieldElements = findAllFields(form as unknown as Document);
-  const fields: FieldNode[] = [];
-
-  let index = 0;
-  for (const el of fieldElements) {
-    if (!isFormField(el)) continue;
-
-    const fieldNode = extractFieldNode(el, index);
-    if (fieldNode) {
-      fields.push(fieldNode);
-      index++;
-    }
-  }
+  const fields = extractFieldsFromElements(fieldElements);
 
   // Skip forms with no meaningful fields
   if (fields.length === 0) {
@@ -340,17 +373,7 @@ async function scanPageForForms(): Promise<FormSnapshot[]> {
   });
 
   if (orphanFields.length > 0) {
-    const fields: FieldNode[] = [];
-    let index = 0;
-
-    for (const el of orphanFields) {
-      if (!isFormField(el)) continue;
-      const fieldNode = extractFieldNode(el, index);
-      if (fieldNode) {
-        fields.push(fieldNode);
-        index++;
-      }
-    }
+    const fields = extractFieldsFromElements(orphanFields);
 
     if (fields.length > 0) {
       const fingerprint = await computeFingerprint(fields);
@@ -486,6 +509,19 @@ function findFieldElement(fieldId: string): HTMLInputElement | HTMLSelectElement
   let element = document.getElementById(fieldId);
   if (element && isFormField(element)) {
     return element;
+  }
+
+  // Radio-group synthetic id (see buildRadioGroupFieldNode in
+  // content-improvements.ts): resolve to *any* radio in the group.
+  // fillField()'s radio branch re-queries by name + target value anyway,
+  // so which specific radio is returned here doesn't matter.
+  const radioGroupMatch = fieldId.match(/^radio-group-(.+)$/);
+  if (radioGroupMatch) {
+    const name = radioGroupMatch[1]!;
+    const radio = document.querySelector(`input[type="radio"][name="${CSS.escape(name)}"]`);
+    if (radio && isFormField(radio)) {
+      return radio;
+    }
   }
 
   // If the fieldId is our generated format (field-X), find by index

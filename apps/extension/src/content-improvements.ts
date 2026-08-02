@@ -5,7 +5,7 @@
  * and better field identification strategies.
  */
 
-import type { FieldSemantic } from '@asterisk/core';
+import type { FieldNode, FieldSemantic, SelectOption } from '@asterisk/core';
 
 // ============================================================================
 // Semantic Field Detection
@@ -395,4 +395,85 @@ export function inferFormPurpose(fields: { semantic: FieldSemantic }[]):
   }
 
   return 'unknown';
+}
+
+// ============================================================================
+// Radio Button Groups
+// ============================================================================
+
+/**
+ * Find a shared label for a radio group via the standard, accessible
+ * `<fieldset><legend>` pattern.
+ *
+ * Returns `null` (rather than guessing) if no fieldset/legend is found -
+ * callers should fall back to something clearly derived from the options
+ * themselves (see `buildRadioGroupFieldNode`) rather than presenting a
+ * guessed label as if it were the real question text.
+ */
+export function findRadioGroupLabel(radios: HTMLInputElement[]): string | null {
+  const first = radios[0];
+  if (!first) return null;
+
+  const fieldset = first.closest('fieldset');
+  if (fieldset) {
+    const legend = fieldset.querySelector('legend');
+    if (legend?.textContent?.trim()) {
+      return legend.textContent.trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Build a single `FieldNode` representing a radio-button *group* - multiple
+ * `<input type="radio">` elements that share a `name` and together express
+ * one logical "pick one of N" question (the pattern many real-world forms,
+ * including government forms with extensive Yes/No questions, use
+ * extensively).
+ *
+ * Without this, a naive "one element = one field" capture (which is what
+ * this content script did before) emits one `FieldNode` per physical radio
+ * input, each with no `options`, so a Yes/No question can never resolve to
+ * a single fillable field with a value to select - it just becomes two
+ * disconnected, unfillable "radio" fields. This function instead reuses the
+ * exact same `options: SelectOption[]` shape `<select>` elements already
+ * populate, so downstream matching/fill-plan/review-UI code has one
+ * consistent way to express "pick one of these choices" rather than a
+ * third, radio-specific representation.
+ *
+ * The `id` this produces (`radio-group-<name>`) only needs to resolve back
+ * to *any* radio in the group at fill time, not a specific one:
+ * `content.ts`'s `fillField()` already targets radios by `name` + target
+ * `value`, re-querying the DOM rather than acting on a single pre-resolved
+ * element - see `findFieldElement`'s matching `radio-group-` branch.
+ *
+ * @param radios - All radio inputs sharing one `name` (the whole group)
+ * @returns A `FieldNode` with `type: 'radio'` and populated `options`, or
+ *   `null` if every radio in the group is hidden (nothing to capture)
+ */
+export function buildRadioGroupFieldNode(radios: HTMLInputElement[]): FieldNode | null {
+  const visible = radios.filter((r) => isFieldVisible(r));
+  if (visible.length === 0) return null;
+
+  const anchor = visible[0]!;
+  const name = anchor.name;
+
+  const options: SelectOption[] = visible.map((r) => ({
+    value: r.value,
+    label: findLabelInShadowDOM(r) || r.value,
+  }));
+
+  const label = findRadioGroupLabel(visible) || options.map((o) => o.label).join(' / ');
+  const required = visible.some((r) => r.required || r.getAttribute('aria-required') === 'true');
+
+  return {
+    id: `radio-group-${name}`,
+    name,
+    label,
+    type: 'radio',
+    semantic: inferFieldSemantic(anchor, label),
+    required,
+    options,
+  };
 }

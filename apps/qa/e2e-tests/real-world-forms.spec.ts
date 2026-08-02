@@ -552,4 +552,90 @@ test.describe('Real-World Form Filling', () => {
       expect(readonlyField?.readonly).toBe(true);
     });
   });
+
+  test.describe('Radio Button Groups', () => {
+    let formPage: Page;
+
+    test.beforeEach(async () => {
+      formPage = await context.newPage();
+    });
+
+    test.afterEach(async () => {
+      // Unconditional cleanup: a context-scoped route left registered
+      // would keep intercepting every later test's own snapshot POSTs in
+      // this shared context for the rest of the file's run.
+      await context.unroute('http://127.0.0.1:17373/v1/form-snapshots');
+      await formPage?.close();
+    });
+
+    /**
+     * Verifies the content script's *actual captured snapshot* (not just
+     * raw DOM structure, which every other test in this file checks) for a
+     * Yes/No-style radio group - the pattern government forms use
+     * extensively for their many "Have you ever...", "Do you have..."
+     * questions. Without grouping, each physical radio becomes its own
+     * unfillable field with no way to express "pick one of these values";
+     * see content-improvements.ts's buildRadioGroupFieldNode doc comment.
+     *
+     * Intercepts the outgoing POST to the desktop app's HTTP bridge rather
+     * than polling GET /v1/form-snapshots afterward: that endpoint is a
+     * single shared slot on the desktop app (last write wins), and this
+     * suite runs fullyParallel, so polling it would race every other test
+     * in this file posting its own snapshot concurrently. Context-scoped
+     * (not formPage-scoped): content.ts doesn't fetch() directly - it
+     * relays the snapshot to the background service worker via
+     * chrome.runtime.sendMessage, and the background worker makes the
+     * actual POST from its own execution context, not formPage's (see
+     * background.ts's sendToDesktop). A formPage.route() would never see
+     * it; only a context-level route covers all pages and service workers
+     * in the extension's browser context - which also means this route
+     * sees every OTHER concurrently-running test's snapshot POSTs too, so
+     * only accept a body that contains this test's own distinctive field
+     * name rather than the first POST that happens to arrive.
+     */
+    test('captures a Yes/No radio group as one field with both options, not two disconnected fields', async () => {
+      let capturedBody: string | null = null;
+      await context.route('http://127.0.0.1:17373/v1/form-snapshots', async (route) => {
+        const body = route.request().method() === 'POST' ? route.request().postData() : null;
+        if (body?.includes('hasPreviousTravel')) {
+          capturedBody = body;
+        }
+        await route.continue();
+      });
+
+      // Unlike most other tests in this file, this one needs the *real*
+      // content script to actually run and capture a snapshot - not just
+      // DOM structure to be present - so it navigates to a real served
+      // page rather than using about:blank + setContent(). Chrome's
+      // <all_urls> content-script matching does not reliably fire for a
+      // synthetic about:blank document the way it does for a real
+      // navigation.
+      await formPage.goto('http://127.0.0.1:8765/radio-group-test-form.html');
+      await formPage.waitForLoadState('domcontentloaded');
+
+      await expect.poll(() => capturedBody, { timeout: 5000 }).not.toBeNull();
+
+      const snapshot = JSON.parse(capturedBody!);
+      const radioFields = snapshot.fields.filter((f: { type: string }) => f.type === 'radio');
+
+      // The two physical <input type="radio"> elements must collapse into
+      // exactly one FieldNode, not two.
+      expect(radioFields).toHaveLength(1);
+
+      const radioField = radioFields[0];
+      expect(radioField.name).toBe('hasPreviousTravel');
+      expect(radioField.id).toBe('radio-group-hasPreviousTravel');
+      expect(radioField.label).toBe('Have you previously traveled internationally?');
+      expect(radioField.required).toBe(true);
+      expect(radioField.options).toEqual([
+        { value: 'Y', label: 'Yes' },
+        { value: 'N', label: 'No' },
+      ]);
+
+      // The unrelated text field must still be captured normally alongside
+      // the grouped radio field - grouping must not swallow other fields.
+      expect(snapshot.fields.some((f: { name: string }) => f.name === 'unrelatedField')).toBe(true);
+      expect(snapshot.fields).toHaveLength(2);
+    });
+  });
 });

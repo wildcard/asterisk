@@ -45,8 +45,84 @@ trip's U.S. address, who's paying) don't fit that model and are
 intentionally excluded, along with the Family, Previous U.S. Travel, and
 Security and Background sections (not yet covered at all). See the module
 doc comment in `fieldMap.ts` and `fixtures/README.md`'s "Section coverage
-and what's intentionally excluded" for the full reasoning, and beads issue
-`asterisk-0s1` for the tracked follow-up on further expansion.
+and what's intentionally excluded" for the full reasoning.
+
+**Why coverage hasn't grown past this since (completion-gap audit note):**
+every `DS160_FIELD_MAP` entry to date is a *representative* field id
+(`ds160_passport_number`, etc.) - a structural contract built from public
+knowledge of the DS-160's section/question layout, explicitly **not**
+scraped from the live form (this project never accesses it - see "Scope"
+above). That was an acceptable way to stand up the mapping + gate
+mechanism for a first slice, but it doesn't scale honestly to Family or
+Previous U.S. Travel: those sections have enough real structural
+complexity (repeating family-member rows, conditional sub-questions) that
+guessing field ids for them would be inventing selectors no real DS-160
+session would actually have, rather than a defensible representative
+contract. Doing that risks producing a mapping that looks authoritative
+but silently wouldn't match the real form at all.
+
+Given that, the higher-value next step - and the one actually implemented
+in this pass - is improving the *capture mechanism* itself (see below),
+so that if/when a human safely captures the real form's structure (a
+read-only, non-submitting export, done by the human, never by an agent -
+still out of scope for this project to do itself), the pipeline that
+receives it actually works correctly. Further `DS160_FIELD_MAP` section
+growth should wait for that real structure rather than more guessed ids.
+
+## Capture mechanism: radio-button groups
+
+**Gap found:** the extension's generic form-capture pipeline
+(`apps/extension/src/content.ts`) previously emitted one `FieldNode` per
+physical form *element*. For a radio-button group - multiple
+`<input type="radio">` elements sharing a `name`, the standard way to ask
+a single "pick one of N" question - that meant **one field per option**,
+each with no `options` list and nothing that identified them as belonging
+together. A Yes/No question became two disconnected, unfillable "radio"
+fields instead of one fillable field with two choices. This matters a
+great deal for a DS-160-style form, which asks dozens of Yes/No questions
+this exact way ("Have you ever...", "Do you have...").
+
+Notably, the existing *fill* side (`content.ts`'s `fillField()`) already
+assumed the correct model - it targets a radio by `name` + target
+`value`, re-querying the DOM rather than acting on one pre-resolved
+element - so capture and fill were already inconsistent with each other
+before this fix, independent of DS-160 specifically.
+
+**Fix:** `apps/extension/src/content-improvements.ts` gained
+`buildRadioGroupFieldNode()` (merges same-name radios into one `FieldNode`
+with `options` populated exactly like a `<select>`'s options) and
+`findRadioGroupLabel()` (resolves the group's question text via the
+standard `<fieldset><legend>` pattern, falling back to joining the option
+labels rather than guessing). `content.ts`'s two field-extraction call
+sites now share one `extractFieldsFromElements()` helper that groups
+same-name radios before building fields, and `findFieldElement()` resolves
+the new `radio-group-<name>` id back to the DOM at fill time.
+
+**Verified:**
+- 11 unit tests (`apps/extension/src/__tests__/content-improvements.test.ts`)
+  covering grouping, label resolution (with and without a fieldset),
+  required-if-any-radio-required, hidden-radio exclusion, and the
+  all-hidden/empty-group null cases.
+- A real-browser E2E test
+  (`apps/qa/e2e-tests/real-world-forms.spec.ts`, "Radio Button Groups")
+  loads a synthetic (non-DS-160) Yes/No fixture
+  (`apps/qa/fixtures/radio-group-test-form.html`), intercepts the
+  extension's actual outgoing snapshot POST, and asserts the real captured
+  `FormSnapshot` has exactly one `radio` field with both options - not the
+  two disconnected fields the old code would have produced. This is a
+  materially stronger check than most of this test file's other cases,
+  which only assert on raw DOM structure rather than the content script's
+  actual captured output.
+- Full apps/extension (`102/102`) and apps/qa E2E (`47 passed / 5 skipped`,
+  3 consecutive stable runs) suites pass; `tsc --noEmit` and `vite build`
+  both clean.
+
+**Not done in this pass** (explicitly out of scope, to keep this slice
+bounded): checkbox *groups* (multi-select "choose all that apply", which
+DS-160 also uses in a few places) get no equivalent treatment yet - only
+radio groups. A checkbox group's semantics (0..N selections, not exactly
+1) don't map onto the same `options`-on-one-field shape as cleanly, and
+would need its own design pass.
 
 ## The review-before-apply boundary
 
@@ -108,21 +184,26 @@ current confirmation.
 
 ## Known limitations / follow-ups
 
-- `ConfirmationGate` was added only to the TypeScript `VaultItem`/
-  `FillRecommendation` types (`packages/core/src/types.ts`); the Rust
-  `VaultItem` struct (`crates/vault/src/lib.rs`) does not have a matching
-  field yet. This is safe for now because the DS-160 fill-plan logic in
-  this slice is a pure `packages/core` library not yet wired to any Tauri
-  command - the Rust vault backend never sees a `VaultItem` produced by
-  this code path. Adding Rust parity is required before the gate can flow
-  through the actual desktop vault backend. (Tracked as beads issue
-  `asterisk-04p`.)
-- Section coverage, while now broader (see "Section coverage" above), still
-  excludes Family, Previous U.S. Travel, and Security and Background
-  entirely, and most of Travel beyond "purpose of trip." Tracked as beads
-  issue `asterisk-0s1`.
-- `apps/desktop` has no test harness yet (no vitest/RTL config), so the UI
-  wiring (`getDisposition` call sites, audit `notes`) is covered by manual
-  code reading, not an automated test. `packages/core`'s pure logic (the
-  exact mapping and the gate itself) is unit-tested. (Tracked as beads
-  issue `asterisk-iaw`.)
+- Rust `VaultItem`/`ConfirmationGate` parity (`crates/vault/src/lib.rs`,
+  `apps/desktop/src-tauri/src/lib.rs`'s `VaultItemJson` wire boundary) and
+  the `apps/desktop` vitest/RTL harness are both done - see git history for
+  the commits that closed beads issues `asterisk-04p` and `asterisk-iaw`.
+- Section coverage, while broader than the first slice (see "Section
+  coverage" above), still excludes Family, Previous U.S. Travel, and
+  Security and Background entirely, and most of Travel beyond "purpose of
+  trip" - and per this pass's audit, growing it further should wait for
+  real captured structure rather than more representative/guessed ids
+  (see "Section coverage" above for the reasoning).
+- Radio-button *groups* are now captured correctly (see "Capture
+  mechanism" above); checkbox groups (multi-select) are not yet handled
+  the same way - each checkbox is still its own independent field, which
+  is actually correct for a true multi-select but means there's no
+  "these N checkboxes are one logical question" grouping the way radios
+  now have.
+- The capture-mechanism fix in this pass improves `apps/extension`'s
+  generic form detection, which is a prerequisite for a real DS-160
+  capture but doesn't itself perform one - nothing in this repository
+  accesses, fills, saves, signs, or submits the live DS-160 form, and nor
+  does this change. A real capture, if/when it happens, is a human action
+  outside this codebase's scope, using the (now more correct) pipeline
+  described above.

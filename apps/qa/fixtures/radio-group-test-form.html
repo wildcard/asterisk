@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Asterisk Test Form - Radio Button Group</title>
+</head>
+<body>
+    <h1>Radio Button Group Test</h1>
+    <p>
+        Generic Yes/No question fixture for testing the content script's
+        radio-group capture (see content-improvements.ts's
+        buildRadioGroupFieldNode). Not modeled on any specific real-world
+        form - synthetic field names only.
+    </p>
+
+    <form id="radioGroupForm">
+        <fieldset>
+            <legend>Have you previously traveled internationally?</legend>
+            <input type="radio" id="travel_yes" name="hasPreviousTravel" value="Y" required>
+            <label for="travel_yes">Yes</label>
+            <input type="radio" id="travel_no" name="hasPreviousTravel" value="N" required>
+            <label for="travel_no">No</label>
+        </fieldset>
+
+        <div>
+            <label for="unrelated">Some other field</label>
+            <input type="text" id="unrelated" name="unrelatedField" placeholder="Some other field">
+        </div>
+
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>
