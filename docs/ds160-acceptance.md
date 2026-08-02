@@ -3,8 +3,9 @@
 Tracked in beads issues `asterisk-kkf` (the acceptance run) and `asterisk-0s1`
 (expanding section coverage beyond the first slice). This document describes
 the mechanism those issues deliver; it deliberately does not restate any
-specific applicant's personal data - see the beads issues themselves (stored
-in the local, gitignored Dolt DB, not in git) for run-specific context.
+specific applicant's personal data. Beads metadata is exported to tracked
+JSONL in this public repository, so it must never contain run-specific facts;
+keep those only in the gitignored local intake described below.
 
 ## Scope
 
@@ -80,10 +81,9 @@ applicant with three gated vault items:
 This is the general mechanism: **any** vault item whose evidence might be
 stale - not just employment - should carry a `ConfirmationGate`, and the
 review-before-apply boundary treats all of them identically (blocked
-regardless of confidence, until a human explicitly confirms). A specific
-run (e.g. the one tracked in `asterisk-kkf`, whose only known employment
-evidence is a single dated snapshot) uses this same pattern to keep that
-candidate value out of any auto-applied fill. Loading a specific person's
+regardless of confidence, until a human explicitly confirms). An acceptance
+run uses this same pattern to keep any stale candidate value out of an
+auto-applied fill. Loading a specific person's
 real candidate values uses this same `VaultItem` + `ConfirmationGate`
 shape, supplied to the local vault at runtime - never committed to this
 repository (see the fixtures README's "No PII in this directory" section
@@ -104,9 +104,7 @@ pre-gates the employer/occupation fields (`confirmationGate.status:
 "pending_confirmation"`) and explicitly instructs that no agent working in
 this repository should infer or guess an employer name on the applicant's
 behalf - that value only ever comes from the applicant's own explicit,
-current confirmation. As of 2026-08-02, the only employment evidence for
-the run tracked in `asterisk-kkf` remains a single June 2026 snapshot, and
-it remains blocked pending that confirmation.
+current confirmation.
 
 ## Known limitations / follow-ups
 

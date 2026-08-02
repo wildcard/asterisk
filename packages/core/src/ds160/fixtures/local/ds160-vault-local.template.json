@@ -120,7 +120,7 @@
     },
     "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" },
     "confirmationGate": {
-      "reason": "REPLACE_WITH_WHY_THIS_IS_UNCONFIRMED - e.g. 'from a prior immigration-prep snapshot, not reconfirmed as current'. See beads issue asterisk-kkf: do not remove this gate until the applicant has explicitly reconfirmed current occupation.",
+      "reason": "REPLACE_WITH_WHY_THIS_IS_UNCONFIRMED - e.g. 'from a prior snapshot, not reconfirmed as current'. Do not remove this gate until the applicant has explicitly reconfirmed current occupation.",
       "evidenceDate": "REPLACE_WITH_EVIDENCE_DATE",
       "status": "pending_confirmation"
     }
@@ -138,7 +138,7 @@
     },
     "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" },
     "confirmationGate": {
-      "reason": "REPLACE_WITH_WHY_THIS_IS_UNCONFIRMED - e.g. 'from a prior immigration-prep snapshot, not reconfirmed as current'. See beads issue asterisk-kkf: as of 2026-08-02 the only employment evidence on file is a June 2026 snapshot, explicitly treated as stale. Do not remove this gate, and do not guess/infer an employer name, until the applicant has explicitly reconfirmed current employment.",
+      "reason": "REPLACE_WITH_WHY_THIS_IS_UNCONFIRMED - e.g. 'from a prior snapshot, not reconfirmed as current'. Do not remove this gate, and do not guess/infer an employer name, until the applicant has explicitly reconfirmed current employment.",
       "evidenceDate": "REPLACE_WITH_EVIDENCE_DATE",
       "status": "pending_confirmation"
     }

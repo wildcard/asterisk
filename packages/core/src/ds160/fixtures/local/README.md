@@ -10,9 +10,9 @@ ignored by default (opt-in tracking, not opt-out - see `.gitignore`).
 
 The rest of `packages/core/src/ds160/fixtures/` is a shared, committed
 test fixture using a fictional applicant ("Alex Example") - see the
-parent directory's `README.md` "No PII" policy. A real run (e.g. the one
-tracked in beads issue `asterisk-kkf`) needs real data, which must never
-be committed. This directory documents exactly how to stage that data
+parent directory's `README.md` "No PII" policy. A real run needs real data,
+which must never be committed or stored in tracked beads metadata. This
+directory documents exactly how to stage that data
 locally, using the same `VaultItem[]` shape the rest of this module
 already uses (`../ds160-vault-example.json`), so it can be loaded into
 the desktop app's vault - or fed directly to `generateDs160FillPlan` in a
@@ -46,10 +46,8 @@ the steps below.
    `pending_confirmation` - do not remove that gate, and do not fill in
    `value` from an old snapshot, resume, or immigration-prep document,
    unless you have *just* explicitly reconfirmed current employment with
-   the applicant. Per beads issue `asterisk-kkf`, as of 2026-08-02 the
-   only employment evidence on file is a single June 2026 snapshot,
-   explicitly treated as stale. **No agent working in this repository
-   should infer, guess, or fill in a specific employer name on the
+   the applicant. **No agent working in this repository should infer,
+   guess, or fill in a specific employer name on the
    applicant's behalf** - that value only ever comes from the applicant's
    own explicit, current confirmation. The same caution applies to any
    other field where the evidence is old or secondhand: add a
