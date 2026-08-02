@@ -92,8 +92,45 @@ pub struct ProvenanceJson {
 pub struct VaultMetadataJson {
     pub created: String,
     pub updated: String,
+    #[serde(default)]
     pub last_used: Option<String>,
+    #[serde(default)]
     pub usage_count: u32,
+}
+
+#[cfg(test)]
+mod vault_item_json_tests {
+    use super::VaultItemJson;
+
+    #[test]
+    fn local_intake_payload_can_omit_usage_metadata() {
+        let payload = r#"{
+            "key": "company",
+            "value": "Example Inc.",
+            "label": "Present Employer or Business Name",
+            "category": "identity",
+            "provenance": {
+                "source": "imported",
+                "timestamp": "2026-08-02T00:00:00-07:00",
+                "confidence": 0.95,
+                "origin": "private signed employment agreement"
+            },
+            "metadata": {
+                "created": "2026-08-02T00:00:00-07:00",
+                "updated": "2026-08-02T00:00:00-07:00"
+            },
+            "confirmationGate": {
+                "reason": "Reconfirm before applying",
+                "evidenceDate": "2026-07-13",
+                "status": "pending_confirmation"
+            }
+        }"#;
+
+        let item: VaultItemJson = serde_json::from_str(payload).expect("local intake payload");
+        assert_eq!(item.metadata.last_used, None);
+        assert_eq!(item.metadata.usage_count, 0);
+        assert!(item.confirmation_gate.is_some());
+    }
 }
 
 // ============================================================================
