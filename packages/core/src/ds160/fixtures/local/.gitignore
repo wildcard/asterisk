@@ -1,0 +1,8 @@
+# Real per-run applicant data - never commit. Only this .gitignore, the
+# README, and *.template.json files are meant to be tracked; anything a
+# human creates here from a template (e.g. ds160-vault-local.json) is
+# ignored by default, opt-in tracking rather than opt-out.
+*
+!.gitignore
+!README.md
+!*.template.json

@@ -115,5 +115,101 @@
       "evidenceDate": "2026-06-01",
       "status": "pending_confirmation"
     }
+  },
+  {
+    "key": "passportNumber",
+    "value": "AA1234567",
+    "label": "Passport Number",
+    "category": "identity",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
+  },
+  {
+    "key": "passportIssuingCountry",
+    "value": "CAN",
+    "label": "Passport Issuing Country",
+    "category": "identity",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
+  },
+  {
+    "key": "passportExpiryDate",
+    "value": "2028-11-30",
+    "label": "Passport Expiration Date",
+    "category": "identity",
+    "provenance": {
+      "source": "imported",
+      "timestamp": "2026-05-01T00:00:00Z",
+      "confidence": 0.6,
+      "origin": "scanned-passport-copy-2026-05"
+    },
+    "metadata": {
+      "created": "2026-05-01T00:00:00Z",
+      "updated": "2026-05-01T00:00:00Z"
+    },
+    "confirmationGate": {
+      "reason": "Expiration date is from a scanned copy of the passport on file and has not been reconfirmed as current - the document may since have been renewed, reissued, or replaced. Confirm against the physical passport before use.",
+      "evidenceDate": "2026-05-01",
+      "status": "pending_confirmation"
+    }
+  },
+  {
+    "key": "travelPurpose",
+    "value": "B",
+    "label": "Purpose of Trip to the U.S.",
+    "category": "identity",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
+  },
+  {
+    "key": "usContactName",
+    "value": "Jordan Sample",
+    "label": "U.S. Contact Name",
+    "category": "contact",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
+  },
+  {
+    "key": "usContactPhone",
+    "value": "+1-555-0199",
+    "label": "U.S. Contact Phone",
+    "category": "contact",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "2026-07-01T00:00:00Z",
+      "confidence": 1.0
+    },
+    "metadata": {
+      "created": "2026-07-01T00:00:00Z",
+      "updated": "2026-07-01T00:00:00Z"
+    }
   }
 ]

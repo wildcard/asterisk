@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { VaultItem } from '../../types';
 import { DS160_FIELD_MAP, mapDs160Field } from '../fieldMap';
+import type { Ds160Section } from '../fieldMap';
 import { generateDs160FillPlan, isGated } from '../plan';
 import { loadDs160FormStructureFixture, loadDs160VaultExampleFixture } from '../fixtures';
 
@@ -22,6 +23,86 @@ describe('DS160_FIELD_MAP', () => {
     expect(DS160_FIELD_MAP.ds160_present_employer_name?.vaultCategory).toBe('identity');
     expect(DS160_FIELD_MAP.ds160_present_employer_name?.vaultKeyPattern).toBe('company');
     expect(DS160_FIELD_MAP.ds160_present_occupation?.vaultKeyPattern).toBe('jobTitle');
+  });
+
+  it('covers every declared Ds160Section at least once', () => {
+    const sections: Ds160Section[] = [
+      'personal_information',
+      'address_and_phone',
+      'present_employment',
+      'passport_information',
+      'travel_information',
+      'us_contact_information',
+    ];
+    const coveredSections = new Set(Object.values(DS160_FIELD_MAP).map((m) => m.section));
+    for (const section of sections) {
+      expect(coveredSections.has(section), `no DS160_FIELD_MAP entry for section ${section}`).toBe(true);
+    }
+  });
+
+  it('maps the passport fields to identity, with distinct keys from the home-address country', () => {
+    expect(DS160_FIELD_MAP.ds160_passport_number).toMatchObject({
+      section: 'passport_information',
+      semantic: 'passportNumber',
+      vaultCategory: 'identity',
+      vaultKeyPattern: 'passportNumber',
+    });
+    expect(DS160_FIELD_MAP.ds160_passport_issuing_country).toMatchObject({
+      section: 'passport_information',
+      semantic: 'country',
+      vaultCategory: 'identity',
+      vaultKeyPattern: 'passportIssuingCountry',
+    });
+    expect(DS160_FIELD_MAP.ds160_passport_expiration_date).toMatchObject({
+      section: 'passport_information',
+      semantic: 'expiryDate',
+      vaultCategory: 'identity',
+      vaultKeyPattern: 'passportExpiryDate',
+    });
+    // Distinct vault keys - a passport's issuing country is not
+    // necessarily the applicant's home address country.
+    expect(DS160_FIELD_MAP.ds160_passport_issuing_country?.vaultKeyPattern).not.toBe(
+      DS160_FIELD_MAP.ds160_home_country?.vaultKeyPattern
+    );
+  });
+
+  it('maps the travel-purpose field to identity', () => {
+    expect(DS160_FIELD_MAP.ds160_travel_purpose).toMatchObject({
+      section: 'travel_information',
+      semantic: 'travelPurpose',
+      vaultCategory: 'identity',
+      vaultKeyPattern: 'travelPurpose',
+    });
+  });
+
+  it('maps the U.S. Contact fields to contact, with keys distinct from the applicant\'s own contact info', () => {
+    expect(DS160_FIELD_MAP.ds160_us_contact_name).toMatchObject({
+      section: 'us_contact_information',
+      semantic: 'fullName',
+      vaultCategory: 'contact',
+      vaultKeyPattern: 'usContactName',
+    });
+    expect(DS160_FIELD_MAP.ds160_us_contact_phone).toMatchObject({
+      section: 'us_contact_information',
+      semantic: 'phone',
+      vaultCategory: 'contact',
+      vaultKeyPattern: 'usContactPhone',
+    });
+    expect(DS160_FIELD_MAP.ds160_us_contact_email).toMatchObject({
+      section: 'us_contact_information',
+      semantic: 'email',
+      vaultCategory: 'contact',
+      vaultKeyPattern: 'usContactEmail',
+    });
+    // Distinct vault keys - the U.S. contact is a different person/entity
+    // from the applicant, so must never resolve to the applicant's own
+    // phone/email vault items.
+    expect(DS160_FIELD_MAP.ds160_us_contact_phone?.vaultKeyPattern).not.toBe(
+      DS160_FIELD_MAP.ds160_contact_phone_primary?.vaultKeyPattern
+    );
+    expect(DS160_FIELD_MAP.ds160_us_contact_email?.vaultKeyPattern).not.toBe(
+      DS160_FIELD_MAP.ds160_contact_email?.vaultKeyPattern
+    );
   });
 });
 
@@ -90,14 +171,57 @@ describe('generateDs160FillPlan (fixture-driven)', () => {
     expect(occupation?.confirmationReason).toBeTruthy();
   });
 
+  // Every field the example fixture deliberately gates - see
+  // fixtures/ds160-vault-example.json. Kept as a single list so adding a
+  // new gated example field only requires updating it here.
+  const GATED_FIELD_IDS = [
+    'ds160_present_employer_name',
+    'ds160_present_occupation',
+    'ds160_passport_expiration_date',
+  ];
+
+  it('gates the passport-expiration-date field: time-sensitive data, stale scanned evidence', () => {
+    const expiry = plan.recommendations.find((r) => r.fieldId === 'ds160_passport_expiration_date');
+    expect(expiry).toBeDefined();
+    expect(expiry?.vaultKey).toBe('passportExpiryDate');
+    expect(expiry?.requiresConfirmation).toBe(true);
+    expect(expiry?.confirmationReason).toMatch(/renewed|reissued|replaced/i);
+  });
+
+  it('matches the passport number, passport issuing country, travel purpose, and U.S. contact fields without gating', () => {
+    const ungatedExpectations: Array<[string, string]> = [
+      ['ds160_passport_number', 'passportNumber'],
+      ['ds160_passport_issuing_country', 'passportIssuingCountry'],
+      ['ds160_travel_purpose', 'travelPurpose'],
+      ['ds160_us_contact_name', 'usContactName'],
+      ['ds160_us_contact_phone', 'usContactPhone'],
+    ];
+    for (const [fieldId, vaultKey] of ungatedExpectations) {
+      const rec = plan.recommendations.find((r) => r.fieldId === fieldId);
+      expect(rec, `expected a recommendation for ${fieldId}`).toBeDefined();
+      expect(rec?.vaultKey).toBe(vaultKey);
+      expect(rec?.requiresConfirmation).toBeFalsy();
+    }
+  });
+
+  it('leaves the optional U.S. contact email unmatched (no vault item, not required)', () => {
+    expect(plan.unmatchedFields).toContain('ds160_us_contact_email');
+    expect(plan.recommendations.some((r) => r.fieldId === 'ds160_us_contact_email')).toBe(false);
+    const field = snapshot.fields.find((f) => f.id === 'ds160_us_contact_email');
+    expect(field?.required).toBe(false);
+  });
+
   it('never marks a non-gated field as requiring confirmation', () => {
-    const nonGatedFields = plan.recommendations.filter(
-      (r) => r.fieldId !== 'ds160_present_employer_name' && r.fieldId !== 'ds160_present_occupation'
-    );
+    const nonGatedFields = plan.recommendations.filter((r) => !GATED_FIELD_IDS.includes(r.fieldId));
     expect(nonGatedFields.length).toBeGreaterThan(0);
     for (const rec of nonGatedFields) {
       expect(rec.requiresConfirmation).toBeFalsy();
     }
+  });
+
+  it('gates exactly the fields the example fixture marks pending_confirmation, no more and no fewer', () => {
+    const actuallyGated = plan.recommendations.filter((r) => r.requiresConfirmation).map((r) => r.fieldId).sort();
+    expect(actuallyGated).toEqual([...GATED_FIELD_IDS].sort());
   });
 
   it('surfaces a plan-level warning when fields require confirmation', () => {

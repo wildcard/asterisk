@@ -134,6 +134,8 @@ export type FieldSemantic =
   | 'dateOfBirth'
   | 'company'
   | 'jobTitle'
+  | 'passportNumber'
+  | 'travelPurpose'
   | 'unknown';
 
 /**

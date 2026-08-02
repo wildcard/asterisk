@@ -1,0 +1,146 @@
+[
+  {
+    "key": "firstName",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "First Name",
+    "category": "identity",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "lastName",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "Last Name",
+    "category": "identity",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "dateOfBirth",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE_YYYY-MM-DD",
+    "label": "Date of Birth",
+    "category": "identity",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "email",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "Email Address",
+    "category": "contact",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "phone",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "Phone Number",
+    "category": "contact",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "country",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "Home Address Country",
+    "category": "address",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "passportNumber",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "Passport Number",
+    "category": "identity",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "passportIssuingCountry",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "Passport Issuing Country",
+    "category": "identity",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "passportExpiryDate",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE_YYYY-MM-DD",
+    "label": "Passport Expiration Date",
+    "category": "identity",
+    "provenance": {
+      "source": "user_entered",
+      "timestamp": "REPLACE_WITH_ISO_DATE",
+      "confidence": 1.0
+    },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "travelPurpose",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "Purpose of Trip to the U.S.",
+    "category": "identity",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "usContactName",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "U.S. Contact Name",
+    "category": "contact",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "usContactPhone",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE",
+    "label": "U.S. Contact Phone",
+    "category": "contact",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "usContactEmail",
+    "value": "REPLACE_WITH_CONFIRMED_VALUE_OR_DELETE_THIS_ENTRY_IF_NONE",
+    "label": "U.S. Contact Email",
+    "category": "contact",
+    "provenance": { "source": "user_entered", "timestamp": "REPLACE_WITH_ISO_DATE", "confidence": 1.0 },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" }
+  },
+  {
+    "key": "jobTitle",
+    "value": "DO_NOT_FILL_WITHOUT_EXPLICIT_CURRENT_CONFIRMATION",
+    "label": "Present Occupation",
+    "category": "identity",
+    "provenance": {
+      "source": "imported",
+      "timestamp": "REPLACE_WITH_EVIDENCE_DATE",
+      "confidence": 0.5,
+      "origin": "REPLACE_WITH_A_DESCRIPTION_OF_WHERE_THIS_CAME_FROM"
+    },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" },
+    "confirmationGate": {
+      "reason": "REPLACE_WITH_WHY_THIS_IS_UNCONFIRMED - e.g. 'from a prior immigration-prep snapshot, not reconfirmed as current'. See beads issue asterisk-kkf: do not remove this gate until the applicant has explicitly reconfirmed current occupation.",
+      "evidenceDate": "REPLACE_WITH_EVIDENCE_DATE",
+      "status": "pending_confirmation"
+    }
+  },
+  {
+    "key": "company",
+    "value": "DO_NOT_FILL_WITHOUT_EXPLICIT_CURRENT_CONFIRMATION",
+    "label": "Present Employer or Business Name",
+    "category": "identity",
+    "provenance": {
+      "source": "imported",
+      "timestamp": "REPLACE_WITH_EVIDENCE_DATE",
+      "confidence": 0.5,
+      "origin": "REPLACE_WITH_A_DESCRIPTION_OF_WHERE_THIS_CAME_FROM"
+    },
+    "metadata": { "created": "REPLACE_WITH_ISO_DATE", "updated": "REPLACE_WITH_ISO_DATE" },
+    "confirmationGate": {
+      "reason": "REPLACE_WITH_WHY_THIS_IS_UNCONFIRMED - e.g. 'from a prior immigration-prep snapshot, not reconfirmed as current'. See beads issue asterisk-kkf: as of 2026-08-02 the only employment evidence on file is a June 2026 snapshot, explicitly treated as stale. Do not remove this gate, and do not guess/infer an employer name, until the applicant has explicitly reconfirmed current employment.",
+      "evidenceDate": "REPLACE_WITH_EVIDENCE_DATE",
+      "status": "pending_confirmation"
+    }
+  }
+]

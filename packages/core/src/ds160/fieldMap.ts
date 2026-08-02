@@ -10,10 +10,22 @@
  *
  * Field IDs and the section taxonomy below are a representative structural
  * contract built from the publicly documented DS-160 section/question
- * layout (Personal Information, Address and Phone, Work/Education/Training).
- * They are NOT scraped from the live CEAC DS-160 form - this project never
- * accesses, fills, or submits the live government form. See
- * `fixtures/README.md` for the full provenance note.
+ * layout (Personal Information, Address and Phone, Work/Education/Training,
+ * Passport, Travel, U.S. Contact). They are NOT scraped from the live CEAC
+ * DS-160 form - this project never accesses, fills, or submits the live
+ * government form. See `fixtures/README.md` for the full provenance note.
+ *
+ * Coverage is deliberately scoped to fields that are genuinely *reusable*
+ * facts worth caching in a vault (a passport number, a usual U.S. contact) -
+ * not every DS-160 question fits that model. Most of the real Travel
+ * section (specific arrival/departure dates, this trip's address in the
+ * U.S., who's paying) is inherently per-application, not a stable fact
+ * about the applicant, so it's intentionally excluded here rather than
+ * forced into the vault+exact-mapping pattern. "Purpose of trip" is the one
+ * Travel field included, since for a recurring-purpose traveler (e.g. a
+ * business visitor whose employer sends them repeatedly) it behaves like
+ * any other cached, reviewable fact - the same way `present_employment`
+ * already treats occupation/employer.
  */
 
 import type { FieldSemantic, VaultCategory } from '../types';
@@ -22,7 +34,10 @@ import type { FieldSemantic, VaultCategory } from '../types';
 export type Ds160Section =
   | 'personal_information'
   | 'address_and_phone'
-  | 'present_employment';
+  | 'present_employment'
+  | 'passport_information'
+  | 'travel_information'
+  | 'us_contact_information';
 
 /** One entry in the exact DS-160 -> vault field mapping table */
 export interface Ds160FieldMapping {
@@ -43,9 +58,9 @@ export interface Ds160FieldMapping {
 }
 
 /**
- * Exact DS-160 field ID -> vault mapping table for the fields covered by
- * this first slice: Personal Information, Address and Phone, and Present
- * Employment (the section containing the gated employer/occupation facts).
+ * Exact DS-160 field ID -> vault mapping table. Covers Personal
+ * Information, Address and Phone, Present Employment, Passport, Travel
+ * (purpose only - see module doc comment), and U.S. Contact.
  */
 export const DS160_FIELD_MAP: Record<string, Ds160FieldMapping> = {
   ds160_personal_surname: {
@@ -103,6 +118,62 @@ export const DS160_FIELD_MAP: Record<string, Ds160FieldMapping> = {
     semantic: 'company',
     vaultCategory: 'identity',
     vaultKeyPattern: 'company',
+  },
+  ds160_passport_number: {
+    fieldId: 'ds160_passport_number',
+    section: 'passport_information',
+    semantic: 'passportNumber',
+    vaultCategory: 'identity',
+    vaultKeyPattern: 'passportNumber',
+  },
+  ds160_passport_issuing_country: {
+    fieldId: 'ds160_passport_issuing_country',
+    section: 'passport_information',
+    semantic: 'country',
+    vaultCategory: 'identity',
+    // Distinct key from ds160_home_country's 'country' - the issuing
+    // authority is not necessarily the applicant's residence.
+    vaultKeyPattern: 'passportIssuingCountry',
+  },
+  ds160_passport_expiration_date: {
+    fieldId: 'ds160_passport_expiration_date',
+    section: 'passport_information',
+    // Reuses the generic "a date something expires" semantic rather than
+    // adding a passport-specific one - same concept as a credit card
+    // expiry, just a different document.
+    semantic: 'expiryDate',
+    vaultCategory: 'identity',
+    vaultKeyPattern: 'passportExpiryDate',
+  },
+  ds160_travel_purpose: {
+    fieldId: 'ds160_travel_purpose',
+    section: 'travel_information',
+    semantic: 'travelPurpose',
+    vaultCategory: 'identity',
+    vaultKeyPattern: 'travelPurpose',
+  },
+  ds160_us_contact_name: {
+    fieldId: 'ds160_us_contact_name',
+    section: 'us_contact_information',
+    semantic: 'fullName',
+    vaultCategory: 'contact',
+    vaultKeyPattern: 'usContactName',
+  },
+  ds160_us_contact_phone: {
+    fieldId: 'ds160_us_contact_phone',
+    section: 'us_contact_information',
+    semantic: 'phone',
+    vaultCategory: 'contact',
+    // Distinct key from the applicant's own 'phone' - this is the U.S.
+    // point of contact's number, a different person/entity entirely.
+    vaultKeyPattern: 'usContactPhone',
+  },
+  ds160_us_contact_email: {
+    fieldId: 'ds160_us_contact_email',
+    section: 'us_contact_information',
+    semantic: 'email',
+    vaultCategory: 'contact',
+    vaultKeyPattern: 'usContactEmail',
   },
 };
 

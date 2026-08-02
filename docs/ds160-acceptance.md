@@ -1,11 +1,12 @@
-# DS-160 acceptance workflow (first slice)
+# DS-160 acceptance workflow
 
-Tracked in beads issue `asterisk-kkf`. This document describes the mechanism
-delivered by that issue's first slice; it deliberately does not restate any
-specific applicant's personal data - see the beads issue itself (stored in
-the local, gitignored Dolt DB, not in git) for run-specific context.
+Tracked in beads issues `asterisk-kkf` (the acceptance run) and `asterisk-0s1`
+(expanding section coverage beyond the first slice). This document describes
+the mechanism those issues deliver; it deliberately does not restate any
+specific applicant's personal data - see the beads issues themselves (stored
+in the local, gitignored Dolt DB, not in git) for run-specific context.
 
-## Scope of this slice
+## Scope
 
 A reproducible, structural DS-160 form contract plus an exact field-to-vault
 mapping and a "confirmation gate" mechanism that blocks any candidate value
@@ -28,8 +29,23 @@ note.
 | Fill plan generation using the exact map | `packages/core/src/ds160/plan.ts` (`generateDs160FillPlan`) |
 | Confirmation-gate types | `packages/core/src/types.ts` (`ConfirmationGate`, `VaultItem.confirmationGate`, `FillRecommendation.requiresConfirmation`/`confirmationReason`) |
 | Synthetic example vault (no real PII) exercising the gate | `packages/core/src/ds160/fixtures/ds160-vault-example.json` |
+| Local-only, gitignored real-data intake template/procedure | `packages/core/src/ds160/fixtures/local/` (see its `README.md`) |
 | Unit tests | `packages/core/src/ds160/__tests__/ds160.test.ts` |
 | Review UI wiring | `apps/desktop/src/components/fillplan/confidence.ts` (`getDisposition`), `FillPlanReviewDialog.tsx` |
+
+## Section coverage
+
+`DS160_FIELD_MAP` (`packages/core/src/ds160/fieldMap.ts`) currently covers:
+Personal Information, Address and Phone, Present Employment, Passport,
+Travel (purpose of trip only), and U.S. Contact - 15 fields total. Coverage
+is scoped to fields that are genuinely *reusable* facts worth caching in a
+vault; per-application specifics (exact arrival/departure dates, this
+trip's U.S. address, who's paying) don't fit that model and are
+intentionally excluded, along with the Family, Previous U.S. Travel, and
+Security and Background sections (not yet covered at all). See the module
+doc comment in `fieldMap.ts` and `fixtures/README.md`'s "Section coverage
+and what's intentionally excluded" for the full reasoning, and beads issue
+`asterisk-0s1` for the tracked follow-up on further expansion.
 
 ## The review-before-apply boundary
 
@@ -48,19 +64,49 @@ note.
 4. If a gated field is applied, the audit entry's `notes` records the gate
    reason, so the append-only audit trail explains *why* it needed review.
 
-## Current-employer/occupation gate
+## Time-sensitive fields and the confirmation gate
 
 The example fixture (`ds160-vault-example.json`) models a fictional
-applicant whose `company` (present employer) and `jobTitle` (present
-occupation) vault items are both gated: sourced from a single, dated
-snapshot rather than a reconfirmed-current source. This is the general
-mechanism a specific run (e.g. the one tracked in `asterisk-kkf`, whose
-only known employment evidence is a single dated snapshot) uses to keep
-that candidate value out of any auto-applied fill until a human explicitly
-reconfirms it. Loading a specific person's real candidate value uses this
-same `VaultItem` + `ConfirmationGate` shape, supplied to the local vault at
-runtime - never committed to this repository (see the fixtures README's
-"No PII in this directory" section).
+applicant with three gated vault items:
+
+- `company` (present employer) and `jobTitle` (present occupation), sourced
+  from a single, dated immigration-prep snapshot rather than a
+  reconfirmed-current source.
+- `passportExpiryDate`, sourced from a scanned copy of the passport rather
+  than the physical document - a passport can be renewed, reissued, or
+  replaced after a scan was made, so its expiration date is exactly as
+  time-sensitive as an employer fact and gets the same treatment.
+
+This is the general mechanism: **any** vault item whose evidence might be
+stale - not just employment - should carry a `ConfirmationGate`, and the
+review-before-apply boundary treats all of them identically (blocked
+regardless of confidence, until a human explicitly confirms). A specific
+run (e.g. the one tracked in `asterisk-kkf`, whose only known employment
+evidence is a single dated snapshot) uses this same pattern to keep that
+candidate value out of any auto-applied fill. Loading a specific person's
+real candidate values uses this same `VaultItem` + `ConfirmationGate`
+shape, supplied to the local vault at runtime - never committed to this
+repository (see the fixtures README's "No PII in this directory" section
+and the next section below).
+
+## Loading real applicant data for an actual run
+
+`packages/core/src/ds160/fixtures/local/` documents a gitignored,
+local-only procedure and template (`ds160-vault-local.template.json`) for
+staging a real applicant's confirmed data and loading it into the running
+desktop app's vault via its existing HTTP bridge - without ever
+committing it. See that directory's `README.md` for the full procedure.
+
+This is documentation plus a `curl` one-liner, not new runtime code:
+`packages/core` ships to a browser/webview context and deliberately has no
+filesystem access, so there is no in-library loader to call. The template
+pre-gates the employer/occupation fields (`confirmationGate.status:
+"pending_confirmation"`) and explicitly instructs that no agent working in
+this repository should infer or guess an employer name on the applicant's
+behalf - that value only ever comes from the applicant's own explicit,
+current confirmation. As of 2026-08-02, the only employment evidence for
+the run tracked in `asterisk-kkf` remains a single June 2026 snapshot, and
+it remains blocked pending that confirmation.
 
 ## Known limitations / follow-ups
 
@@ -71,22 +117,14 @@ runtime - never committed to this repository (see the fixtures README's
   this slice is a pure `packages/core` library not yet wired to any Tauri
   command - the Rust vault backend never sees a `VaultItem` produced by
   this code path. Adding Rust parity is required before the gate can flow
-  through the actual desktop vault backend.
-- Section coverage is intentionally narrow for this first slice (Personal
-  Information, Address and Phone, Present Employment). Expanding to the
-  rest of the DS-160 is future work.
+  through the actual desktop vault backend. (Tracked as beads issue
+  `asterisk-04p`.)
+- Section coverage, while now broader (see "Section coverage" above), still
+  excludes Family, Previous U.S. Travel, and Security and Background
+  entirely, and most of Travel beyond "purpose of trip." Tracked as beads
+  issue `asterisk-0s1`.
 - `apps/desktop` has no test harness yet (no vitest/RTL config), so the UI
   wiring (`getDisposition` call sites, audit `notes`) is covered by manual
-  code reading and the pre-existing `tsc` module-resolution limitation
-  below, not by an automated test. `packages/core`'s pure logic (the exact
-  mapping and the gate itself) is unit-tested.
-- Pre-existing, unrelated to this slice: `packages/core`'s `tsc` build
-  currently fails (`src/__tests__/matching.test.ts` imports non-exported
-  `VaultItem`/`FieldNode` from `../matching`; `src/performance.ts` has
-  several strict-mode type errors). Because `turbo`'s `test` task depends
-  on `build`, `pnpm test` at the repo root does not currently reach any
-  package's tests, and no package has a built `dist/`, so `apps/desktop`
-  cannot resolve `@asterisk/core` via TypeScript either. This was true
-  before this slice and this slice does not touch those files. Verified via
-  `npx vitest run` directly (bypasses the turbo `build` dependency) and
-  `npx tsc --noEmit`, run from `packages/core`.
+  code reading, not an automated test. `packages/core`'s pure logic (the
+  exact mapping and the gate itself) is unit-tested. (Tracked as beads
+  issue `asterisk-iaw`.)

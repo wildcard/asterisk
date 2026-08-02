@@ -4,10 +4,10 @@
   "title": "DS-160: Online Nonimmigrant Visa Application",
   "capturedAt": "2026-08-02T00:00:00Z",
   "fingerprint": {
-    "fieldCount": 8,
+    "fieldCount": 15,
     "fieldTypes": ["date", "email", "select", "tel", "text"],
-    "requiredCount": 8,
-    "hash": "ds160-personal-address-employment-v1"
+    "requiredCount": 14,
+    "hash": "ds160-personal-address-employment-passport-travel-uscontact-v1"
   },
   "fields": [
     {
@@ -83,6 +83,74 @@
       "semantic": "company",
       "required": true,
       "maxLength": 33
+    },
+    {
+      "id": "ds160_passport_number",
+      "name": "passport_number",
+      "label": "Passport/Travel Document Number",
+      "type": "text",
+      "semantic": "passportNumber",
+      "required": true,
+      "maxLength": 20
+    },
+    {
+      "id": "ds160_passport_issuing_country",
+      "name": "passport_issuing_country",
+      "label": "Passport - Country/Authority That Issued It",
+      "type": "select",
+      "semantic": "country",
+      "required": true,
+      "options": [
+        { "value": "CAN", "label": "CANADA" },
+        { "value": "USA", "label": "UNITED STATES OF AMERICA" }
+      ]
+    },
+    {
+      "id": "ds160_passport_expiration_date",
+      "name": "passport_expiration_date",
+      "label": "Passport Expiration Date",
+      "type": "date",
+      "semantic": "expiryDate",
+      "required": true
+    },
+    {
+      "id": "ds160_travel_purpose",
+      "name": "travel_purpose",
+      "label": "Purpose of Trip to the U.S.",
+      "type": "select",
+      "semantic": "travelPurpose",
+      "required": true,
+      "options": [
+        { "value": "B", "label": "TEMPORARY BUSINESS OR PLEASURE VISITOR (B)" },
+        { "value": "F", "label": "STUDENT (F)" }
+      ]
+    },
+    {
+      "id": "ds160_us_contact_name",
+      "name": "us_contact_name",
+      "label": "Contact Person or Organization Name in the U.S.",
+      "type": "text",
+      "semantic": "fullName",
+      "required": true,
+      "maxLength": 33
+    },
+    {
+      "id": "ds160_us_contact_phone",
+      "name": "us_contact_phone",
+      "label": "U.S. Contact - Phone Number",
+      "type": "tel",
+      "semantic": "phone",
+      "required": true,
+      "autocomplete": "tel"
+    },
+    {
+      "id": "ds160_us_contact_email",
+      "name": "us_contact_email",
+      "label": "U.S. Contact - E-Mail Address",
+      "type": "email",
+      "semantic": "email",
+      "required": false,
+      "autocomplete": "email"
     }
   ]
 }
