@@ -10,7 +10,7 @@
       "placeholder": "Company name",
       "required": false,
       "autocomplete": null,
-      "semantic": null
+      "semantic": "unknown"
     },
     {
       "id": "field_2",
@@ -20,7 +20,7 @@
       "placeholder": "Job title",
       "required": false,
       "autocomplete": null,
-      "semantic": null
+      "semantic": "unknown"
     },
     {
       "id": "field_3",
@@ -30,7 +30,7 @@
       "placeholder": "Phone or email",
       "required": false,
       "autocomplete": null,
-      "semantic": null
+      "semantic": "unknown"
     },
     {
       "id": "field_4",
@@ -40,7 +40,7 @@
       "placeholder": "you@example.com",
       "required": true,
       "autocomplete": "email",
-      "semantic": null
+      "semantic": "unknown"
     }
   ]
 }

@@ -68,10 +68,18 @@ export async function openPopupForTab(context: BrowserContext, extensionId: stri
 /**
  * Wait for desktop app API to be ready by attempting to connect
  *
- * @param maxRetries - Maximum number of retry attempts (default: 20)
+ * The Tauri webServer entry in playwright.config.ts only waits for the
+ * Vite dev server on :1420 to respond - the Rust backend (and this HTTP
+ * bridge on :17373) keeps compiling in the background after that and can
+ * take significantly longer on a cold build (observed: ~16.4s for a full
+ * `cargo build` in this workspace). The default budget here must comfortably
+ * exceed that, or every test that seeds vault data races a still-compiling
+ * backend and fails with a misleading "did not become ready" error.
+ *
+ * @param maxRetries - Maximum number of retry attempts (default: 90 -> 45s at the default delay)
  * @param delayMs - Delay between retries in ms (default: 500)
  */
-async function waitForDesktopApp(maxRetries: number = 20, delayMs: number = 500): Promise<void> {
+async function waitForDesktopApp(maxRetries: number = 90, delayMs: number = 500): Promise<void> {
   for (let i = 0; i < maxRetries; i++) {
     try {
       // Try a simple GET to the vault endpoint
@@ -105,6 +113,50 @@ export async function seedVaultData(items: any[]): Promise<void> {
       body: JSON.stringify(item),
     });
   }
+}
+
+/**
+ * Posts a form snapshot directly to the desktop app's HTTP bridge, so tests
+ * that drive the desktop app's own UI (not through the extension's content
+ * script) have something for the "Match" tab to load.
+ *
+ * Computes the `domain`/`fingerprint`/`capturedAt` envelope the backend's
+ * `FormSnapshotJson` requires (see apps/desktop/src-tauri/src/lib.rs)
+ * around a plain `{ url, title, fields }` fixture, so fixtures like
+ * fixtures/test-form.json can stay focused on just the fields under test.
+ *
+ * @param form - `{ url, title, fields }` - see fixtures/test-form.json
+ */
+export async function postFormSnapshot(form: {
+  url: string;
+  title: string;
+  fields: Array<{ id: string; type: string; required: boolean; [key: string]: unknown }>;
+}): Promise<void> {
+  await waitForDesktopApp();
+
+  const domain = new URL(form.url).hostname;
+  const fieldTypes = [...new Set(form.fields.map((f) => f.type))].sort();
+  const requiredCount = form.fields.filter((f) => f.required).length;
+
+  const snapshot = {
+    url: form.url,
+    domain,
+    title: form.title,
+    capturedAt: new Date().toISOString(),
+    fingerprint: {
+      fieldCount: form.fields.length,
+      fieldTypes,
+      requiredCount,
+      hash: `${domain}-${form.fields.length}-${requiredCount}`,
+    },
+    fields: form.fields,
+  };
+
+  await fetch('http://127.0.0.1:17373/v1/form-snapshots', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(snapshot),
+  });
 }
 
 /**

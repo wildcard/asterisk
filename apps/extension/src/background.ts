@@ -328,11 +328,22 @@ async function handleGetPopupData(tabId: number): Promise<any> {
 
 /**
  * Handle GET_DESKTOP_STATUS - return desktop connection status
+ *
+ * Performs a live health check rather than returning the cached
+ * `isDesktopAvailable` value as-is: that cache is otherwise only refreshed
+ * by the health-check alarm, which (per Chrome's Alarms API minimum) fires
+ * at most once a minute. Without a live check here, a user opening the
+ * popup shortly after the desktop app starts (or stops) could see a stale
+ * "not connected" (or "connected") status for up to a minute. The live
+ * check's own success/failure also updates `isDesktopAvailable`, so this
+ * doubles as an opportunistic cache refresh for `fetchVaultItems` and
+ * `sendToDesktop`.
  */
-function handleGetDesktopStatus(): any {
+async function handleGetDesktopStatus(): Promise<any> {
+  const connected = await checkDesktopHealth();
   return {
     type: 'DESKTOP_STATUS',
-    connected: isDesktopAvailable,
+    connected,
   };
 }
 
@@ -444,7 +455,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'GET_DESKTOP_STATUS') {
-    sendResponse(handleGetDesktopStatus());
+    handleGetDesktopStatus().then(sendResponse);
     return true;
   }
 

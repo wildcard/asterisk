@@ -21,6 +21,10 @@ const EXTENSION_PATH = resolve(__dirname, '../extension/dist');
  */
 export default defineConfig({
   testDir: './e2e-tests',
+  // Waits for the Rust backend's HTTP bridge (:17373) to be ready, not just
+  // Vite (:1420, covered by the webServer.url check below) - see
+  // global-setup.ts for why this is necessary.
+  globalSetup: './global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -57,14 +61,29 @@ export default defineConfig({
     },
   ],
 
-  // Webserver configuration - start the Tauri dev server if not running
-  // Comment this out if you want to manually start the server
-  webServer: {
-    command: 'cd ../desktop && pnpm tauri dev',
-    url: 'http://localhost:1420',
-    reuseExistingServer: true,
-    timeout: 120 * 1000, // 2 minutes for Tauri to start
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+  // Webserver configuration - start required servers if not already running.
+  // Comment out an entry if you want to manage that server manually.
+  webServer: [
+    {
+      command: 'cd ../desktop && pnpm tauri dev',
+      url: 'http://localhost:1420',
+      reuseExistingServer: true,
+      timeout: 120 * 1000, // 2 minutes for Tauri to start
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      // Static server for the form-filling/real-world-forms specs, which
+      // navigate to http://127.0.0.1:8765/test-llm-form.html. Reuses
+      // scripts/start-test-server.sh so there's a single source of truth
+      // for "how do I serve the test forms" (also documented in the QA
+      // README's manual-testing instructions).
+      command: './scripts/start-test-server.sh',
+      url: 'http://127.0.0.1:8765/test-llm-form.html',
+      reuseExistingServer: true,
+      timeout: 30 * 1000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  ],
 });

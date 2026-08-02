@@ -111,6 +111,13 @@ test.describe('Extension Popup E2E', () => {
     });
 
     test.afterEach(async () => {
+      // Unconditional (not just at the end of each test body): if a test
+      // throws before reaching its own unroute() call, an unremoved
+      // context-scoped route would otherwise leak into every later test in
+      // this shared context. Unrouting a pattern with no handler is a safe
+      // no-op.
+      await context.unroute('http://127.0.0.1:17373/**');
+      await context.unroute('http://127.0.0.1:17373/health');
       await popupPage?.close();
     });
 
@@ -121,6 +128,20 @@ test.describe('Extension Popup E2E', () => {
     });
 
     test('loading state matches expected layout', async () => {
+      // Popup starts with desktopConnected=false and only flips once its
+      // (now-live, see background.ts handleGetDesktopStatus) health check
+      // resolves. "Right after the load event" is not a reliable proxy for
+      // "before that check resolves" - it's a real network round trip, and
+      // on a fast/idle machine it can complete before this screenshot is
+      // taken, flipping the footer to "connected" and diffing against the
+      // "not connected" baseline. Delay the health check response so the
+      // popup is deterministically still in its pre-resolution state for
+      // the whole capture window, instead of racing it.
+      await context.route('http://127.0.0.1:17373/health', async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await route.continue();
+      });
+
       // Open fresh page to catch loading state
       const loadingPage = await context.newPage();
       const loadingPromise = loadingPage.goto(`chrome-extension://${extensionId}/popup/popup.html`);
@@ -136,8 +157,12 @@ test.describe('Extension Popup E2E', () => {
     });
 
     test('error state matches expected layout', async () => {
-      // Mock error response
-      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+      // Mock error response. Must be context-scoped, not page-scoped: the
+      // connection status shown here comes from the background service
+      // worker's own live health check (GET_DESKTOP_STATUS ->
+      // checkDesktopHealth()), not a fetch made by popupPage itself, so a
+      // popupPage.route() mock would never actually be observed.
+      await context.route('http://127.0.0.1:17373/**', async (route) => {
         await route.abort('failed');
       });
 
@@ -151,8 +176,8 @@ test.describe('Extension Popup E2E', () => {
     });
 
     test('offline indicator matches expected layout', async () => {
-      // Mock desktop offline
-      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+      // Mock desktop offline (context-scoped - see comment above).
+      await context.route('http://127.0.0.1:17373/**', async (route) => {
         await route.abort('failed');
       });
 
@@ -278,6 +303,9 @@ test.describe('Extension Popup E2E', () => {
     });
 
     test.afterEach(async () => {
+      // Unconditional cleanup - see the identical comment in the Visual
+      // Regression describe's afterEach above.
+      await context.unroute('http://127.0.0.1:17373/**');
       await popupPage?.close();
     });
 
@@ -298,8 +326,10 @@ test.describe('Extension Popup E2E', () => {
     });
 
     test('handles network timeout gracefully', async () => {
-      // Mock slow/timeout response from desktop app
-      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+      // Mock slow/timeout response from desktop app. Context-scoped: the
+      // connection status comes from the background service worker's own
+      // live health check, not a fetch made by popupPage itself.
+      await context.route('http://127.0.0.1:17373/**', async (route) => {
         // Delay then fail
         await new Promise((resolve) => setTimeout(resolve, 2000));
         await route.abort('timedout');
@@ -340,8 +370,10 @@ test.describe('Extension Popup E2E', () => {
     });
 
     test('handles HTTP error responses', async () => {
-      // Mock 500 error from desktop app
-      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+      // Mock 500 error from desktop app. Context-scoped: the connection
+      // status comes from the background service worker's own live health
+      // check, not a fetch made by popupPage itself.
+      await context.route('http://127.0.0.1:17373/**', async (route) => {
         await route.fulfill({
           status: 500,
           contentType: 'application/json',
@@ -417,12 +449,19 @@ test.describe('Extension Popup E2E', () => {
     });
 
     test.afterEach(async () => {
+      // Safety net: each test below also unroutes mid-test as part of its
+      // own reconnection logic, but if an earlier assertion throws first,
+      // that unroute() is skipped - see the identical comment in the
+      // Visual Regression describe's afterEach above.
+      await context.unroute('http://127.0.0.1:17373/**');
       await popupPage?.close();
     });
 
     test('shows offline then online status on reconnect', async () => {
-      // Start with desktop offline
-      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+      // Start with desktop offline. Context-scoped: the connection status
+      // comes from the background service worker's own live health check,
+      // not a fetch made by popupPage itself.
+      await context.route('http://127.0.0.1:17373/**', async (route) => {
         await route.abort('failed');
       });
 
@@ -434,7 +473,7 @@ test.describe('Extension Popup E2E', () => {
       await expect(offlineStatus).toBeVisible();
 
       // Simulate reconnection by unblocking routes
-      await popupPage.unroute('http://127.0.0.1:17373/**');
+      await context.unroute('http://127.0.0.1:17373/**');
 
       // Reload to trigger reconnection check
       await popupPage.reload();
@@ -446,8 +485,8 @@ test.describe('Extension Popup E2E', () => {
     });
 
     test('updates connection status after network recovery', async () => {
-      // Start offline
-      await popupPage.route('http://127.0.0.1:17373/**', async (route) => {
+      // Start offline (context-scoped - see comment above).
+      await context.route('http://127.0.0.1:17373/**', async (route) => {
         await route.abort('failed');
       });
 
@@ -460,7 +499,7 @@ test.describe('Extension Popup E2E', () => {
       expect(hasOffline).toBeGreaterThan(0);
 
       // Now allow requests (simulate network recovery)
-      await popupPage.unroute('http://127.0.0.1:17373/**');
+      await context.unroute('http://127.0.0.1:17373/**');
 
       // Reload to check connection status
       await popupPage.reload();

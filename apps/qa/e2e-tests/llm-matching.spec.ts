@@ -1,5 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import vaultItems from '../fixtures/vault-items.json' with { type: 'json' };
+import testForm from '../fixtures/test-form.json' with { type: 'json' };
+import { postFormSnapshot } from '../fixtures/extension-context';
 
 /**
  * E2E Tests for LLM-Powered Field Matching
@@ -16,7 +18,26 @@ import vaultItems from '../fixtures/vault-items.json' with { type: 'json' };
 const TEST_API_KEY = process.env.CLAUDE_API_KEY || 'sk-ant-test-placeholder-key-12345678901234567890';
 const BASE_URL = 'http://localhost:1420';
 
-test.describe('LLM Matching E2E', () => {
+// These phases build cumulative state (vault items, settings) in a single
+// shared desktop app backend (one Tauri process, one in-memory vault) and
+// must run in declaration order. The suite's playwright.config.ts sets
+// `fullyParallel: true`, which by default distributes individual tests to
+// different workers with no ordering guarantee - without `.serial()`, a
+// later phase can start (and observe empty vault/no recommendations)
+// before an earlier phase has finished seeding data.
+test.describe.serial('LLM Matching E2E', () => {
+  // Phase 3 (and Success Criteria) load the "Match" tab, which reads the
+  // desktop app's shared form-snapshot store (GET /v1/form-snapshots) -
+  // there's nothing else in this file that posts one, since (unlike
+  // form-filling-integration.spec.ts / real-world-forms.spec.ts) these
+  // tests drive the desktop app's own UI directly rather than going
+  // through the extension's content-script detection flow. Post the
+  // fixture form once, before any phase runs, so "Match" always has
+  // something to work with regardless of what other spec files did.
+  test.beforeAll(async () => {
+    await postFormSnapshot(testForm);
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.goto(BASE_URL);
 
