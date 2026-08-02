@@ -38,7 +38,7 @@ export interface Ds160FieldMapping {
   /** Vault category to search within */
   vaultCategory: VaultCategory;
 
-  /** Vault item key pattern this field resolves to (exact substring match) */
+  /** Vault item key this field resolves to (must match `VaultItem.key` exactly) */
   vaultKeyPattern: string;
 }
 

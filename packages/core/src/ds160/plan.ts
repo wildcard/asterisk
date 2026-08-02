@@ -22,22 +22,22 @@ export function isGated(item: VaultItem): boolean {
   return item.confirmationGate?.status === 'pending_confirmation';
 }
 
-/** Find the vault item for an exact DS-160 category + key pattern. */
+/**
+ * Find the vault item for an exact DS-160 category + key pattern.
+ *
+ * Deliberately exact only (`category` and `key` must both match exactly) -
+ * no substring/label fallback. A government form's exact-mapping contract
+ * must not silently select a similarly-named or historical item (e.g. a
+ * `companyOld` or `companyPrevious` key partially matching `company`).
+ * Anything that isn't an exact key match is left unmatched and surfaces via
+ * `FillPlan.unmatchedFields`, same as an entirely missing vault item.
+ */
 function findExactVaultItem(
   vaultItems: VaultItem[],
   category: VaultCategory,
   keyPattern: string
 ): VaultItem | undefined {
-  const exact = vaultItems.find((item) => item.category === category && item.key === keyPattern);
-  if (exact) return exact;
-
-  // Fall back to a substring match on key or label, still scoped to category.
-  return vaultItems.find(
-    (item) =>
-      item.category === category &&
-      (item.key.toLowerCase().includes(keyPattern.toLowerCase()) ||
-        item.label.toLowerCase().includes(keyPattern.toLowerCase()))
-  );
+  return vaultItems.find((item) => item.category === category && item.key === keyPattern);
 }
 
 /**

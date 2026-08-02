@@ -125,6 +125,63 @@ describe('generateDs160FillPlan (empty vault)', () => {
   });
 });
 
+describe('generateDs160FillPlan (exact matching, no substring/label fallback)', () => {
+  // Minimal snapshot with just the employer field, to isolate this from the
+  // other fixture fields.
+  const employerOnlySnapshot = (() => {
+    const snapshot = loadDs160FormStructureFixture();
+    const employerField = snapshot.fields.find((f) => f.id === 'ds160_present_employer_name');
+    if (!employerField) throw new Error('fixture missing ds160_present_employer_name');
+    return { ...snapshot, fields: [employerField] };
+  })();
+
+  const makeVaultItem = (overrides: Partial<VaultItem>): VaultItem => ({
+    key: 'unused',
+    value: 'unused',
+    label: 'Unused',
+    category: 'identity',
+    provenance: { source: 'user_entered', timestamp: new Date(), confidence: 1 },
+    metadata: { created: new Date(), updated: new Date() },
+    ...overrides,
+  });
+
+  it('does NOT match a vault item whose key merely contains the target key as a substring', () => {
+    const decoy = makeVaultItem({ key: 'companyOld', value: 'Stale Corp', label: 'Previous Employer' });
+    const plan = generateDs160FillPlan(employerOnlySnapshot, [decoy]);
+
+    expect(plan.recommendations).toHaveLength(0);
+    expect(plan.unmatchedFields).toContain('ds160_present_employer_name');
+  });
+
+  it('does NOT match a vault item whose label (not key) contains the target key pattern', () => {
+    const decoy = makeVaultItem({ key: 'previousEmployer', value: 'Stale Corp', label: 'Company (Previous)' });
+    const plan = generateDs160FillPlan(employerOnlySnapshot, [decoy]);
+
+    expect(plan.recommendations).toHaveLength(0);
+    expect(plan.unmatchedFields).toContain('ds160_present_employer_name');
+  });
+
+  it('does NOT match across categories even with an exact key match', () => {
+    // vaultKeyPattern 'company' expects category 'identity'; put it under 'custom' instead.
+    const wrongCategory = makeVaultItem({ key: 'company', value: 'Right Key Wrong Category', category: 'custom' });
+    const plan = generateDs160FillPlan(employerOnlySnapshot, [wrongCategory]);
+
+    expect(plan.recommendations).toHaveLength(0);
+    expect(plan.unmatchedFields).toContain('ds160_present_employer_name');
+  });
+
+  it('DOES match once an exact category + key item is present, even alongside similar decoys', () => {
+    const decoyBySubstring = makeVaultItem({ key: 'companyOld', value: 'Stale Corp', label: 'Previous Employer' });
+    const decoyByLabel = makeVaultItem({ key: 'previousEmployer', value: 'Stale Corp 2', label: 'Company (Previous)' });
+    const exact = makeVaultItem({ key: 'company', value: 'Current Co', label: 'Present Employer' });
+
+    const plan = generateDs160FillPlan(employerOnlySnapshot, [decoyBySubstring, decoyByLabel, exact]);
+
+    expect(plan.recommendations).toHaveLength(1);
+    expect(plan.recommendations[0]?.vaultKey).toBe('company');
+  });
+});
+
 describe('generateDs160FillPlan (unknown field ids)', () => {
   it('reports fields with no DS160_FIELD_MAP entry as unmatched rather than throwing', () => {
     const snapshot = loadDs160FormStructureFixture();
