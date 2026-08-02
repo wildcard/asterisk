@@ -91,6 +91,36 @@ pub enum VaultCategory {
     Custom,
 }
 
+/// Status of a [`ConfirmationGate`]. Currently only one state; kept as an
+/// enum (rather than a bare bool) so a future workflow (e.g. "confirmed",
+/// "rejected") can be added without a breaking wire-format change - mirrors
+/// the TypeScript `ConfirmationGate.status` union in `packages/core/src/types.ts`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfirmationGateStatus {
+    PendingConfirmation,
+}
+
+/// A vault item gated pending explicit user confirmation.
+///
+/// Mirrors `ConfirmationGate` in `packages/core/src/types.ts`. Used when a
+/// candidate value is derived from evidence that is stale, single-sourced,
+/// or otherwise unverified as currently accurate. While a gate is present
+/// with status `PendingConfirmation`, consumers must surface the item as
+/// requiring explicit review and must never let it be silently auto-applied,
+/// regardless of match confidence.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ConfirmationGate {
+    /// Human-readable reason this value is gated
+    pub reason: String,
+
+    /// ISO 8601 date of the evidence the candidate value is based on
+    pub evidence_date: String,
+
+    /// Gate status - currently only one state, extensible for future workflow
+    pub status: ConfirmationGateStatus,
+}
+
 /// A single item stored in the user's vault
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VaultItem {
@@ -111,6 +141,15 @@ pub struct VaultItem {
 
     /// Storage metadata
     pub metadata: VaultMetadata,
+
+    /// Present when this item is a candidate value pending explicit user
+    /// confirmation (see [`ConfirmationGate`]). Absent for confirmed data.
+    ///
+    /// `#[serde(default)]` so a `VaultItem` serialized before this field
+    /// existed (e.g. from an older audit log or persisted store) still
+    /// deserializes cleanly, defaulting to `None`.
+    #[serde(default)]
+    pub confirmation_gate: Option<ConfirmationGate>,
 }
 
 impl VaultItem {
@@ -129,7 +168,15 @@ impl VaultItem {
             category,
             provenance,
             metadata: VaultMetadata::default(),
+            confirmation_gate: None,
         }
+    }
+
+    /// Attach a confirmation gate, marking this item as a candidate value
+    /// pending explicit user confirmation.
+    pub fn with_confirmation_gate(mut self, gate: ConfirmationGate) -> Self {
+        self.confirmation_gate = Some(gate);
+        self
     }
 
     /// Update the item's value and timestamp
@@ -349,5 +396,98 @@ mod tests {
         item.update_value("new_value");
         assert_eq!(item.value, "new_value");
         assert!(item.metadata.updated > original_updated);
+    }
+
+    // ========================================================================
+    // ConfirmationGate - serde round-trip and backward compatibility
+    // ========================================================================
+
+    fn test_confirmation_gate() -> ConfirmationGate {
+        ConfirmationGate {
+            reason: "Sourced from a single prior snapshot, not reconfirmed as current".to_string(),
+            evidence_date: "2026-06-01".to_string(),
+            status: ConfirmationGateStatus::PendingConfirmation,
+        }
+    }
+
+    #[test]
+    fn test_vault_item_without_gate_round_trips_through_serde() {
+        let item = create_test_item("no-gate");
+        assert!(item.confirmation_gate.is_none());
+
+        let json = serde_json::to_string(&item).unwrap();
+        let round_tripped: VaultItem = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(round_tripped, item);
+        assert!(round_tripped.confirmation_gate.is_none());
+    }
+
+    #[test]
+    fn test_vault_item_with_gate_round_trips_through_serde() {
+        let item = create_test_item("gated").with_confirmation_gate(test_confirmation_gate());
+        assert!(item.confirmation_gate.is_some());
+
+        let json = serde_json::to_string(&item).unwrap();
+        let round_tripped: VaultItem = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(round_tripped, item);
+        let gate = round_tripped.confirmation_gate.unwrap();
+        assert_eq!(gate.reason, "Sourced from a single prior snapshot, not reconfirmed as current");
+        assert_eq!(gate.evidence_date, "2026-06-01");
+        assert_eq!(gate.status, ConfirmationGateStatus::PendingConfirmation);
+    }
+
+    /// The specific backward-compatibility case the `#[serde(default)]`
+    /// attribute exists for: a `VaultItem` serialized *before*
+    /// `confirmation_gate` existed (e.g. an older audit log entry, or a
+    /// payload from a client built against an older schema) has no
+    /// `confirmation_gate` key in its JSON at all - not `null`, entirely
+    /// absent. Without `#[serde(default)]` this would fail to deserialize
+    /// with a "missing field" error.
+    #[test]
+    fn test_deserializes_pre_existing_json_with_confirmation_gate_key_entirely_absent() {
+        let legacy_json = r#"{
+            "key": "email",
+            "value": "user@example.com",
+            "label": "Email",
+            "category": "contact",
+            "provenance": {
+                "source": "user_entered",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "confidence": 1.0,
+                "origin": null
+            },
+            "metadata": {
+                "created": "2026-01-01T00:00:00Z",
+                "updated": "2026-01-01T00:00:00Z",
+                "last_used": null,
+                "usage_count": 0
+            }
+        }"#;
+
+        let item: VaultItem =
+            serde_json::from_str(legacy_json).expect("legacy VaultItem JSON without confirmation_gate must still deserialize");
+
+        assert_eq!(item.key, "email");
+        assert!(item.confirmation_gate.is_none());
+    }
+
+    #[test]
+    fn test_confirmation_gate_status_serializes_as_snake_case() {
+        let gate = test_confirmation_gate();
+        let json = serde_json::to_string(&gate).unwrap();
+        assert!(
+            json.contains(r#""status":"pending_confirmation""#),
+            "expected snake_case status in {json}"
+        );
+    }
+
+    #[test]
+    fn test_with_confirmation_gate_builder_sets_the_gate() {
+        let item = create_test_item("builder-test").with_confirmation_gate(test_confirmation_gate());
+        assert_eq!(
+            item.confirmation_gate.as_ref().unwrap().status,
+            ConfirmationGateStatus::PendingConfirmation
+        );
     }
 }

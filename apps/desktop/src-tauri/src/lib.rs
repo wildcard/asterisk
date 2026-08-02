@@ -1,7 +1,8 @@
 mod llm;
 
 use asterisk_vault::{
-    InMemoryStore, Provenance, ProvenanceSource, VaultCategory, VaultItem, VaultStore,
+    ConfirmationGate, ConfirmationGateStatus, InMemoryStore, Provenance, ProvenanceSource,
+    VaultCategory, VaultItem, VaultStore,
 };
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
@@ -55,6 +56,28 @@ pub struct VaultItemJson {
     pub category: String,
     pub provenance: ProvenanceJson,
     pub metadata: VaultMetadataJson,
+
+    /// Mirrors TypeScript `VaultItem.confirmationGate?: ConfirmationGate`.
+    /// `#[serde(default)]` so a payload from before this field existed still
+    /// deserializes; `skip_serializing_if` so a confirmed (non-gated) item
+    /// serializes without the key at all, matching how the TypeScript side
+    /// already omits it for confirmed items (see
+    /// `packages/core/src/ds160/plan.ts`'s conditional spread).
+    #[serde(
+        rename = "confirmationGate",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub confirmation_gate: Option<ConfirmationGateJson>,
+}
+
+/// Mirrors TypeScript `ConfirmationGate` (`packages/core/src/types.ts`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfirmationGateJson {
+    pub reason: String,
+    #[serde(rename = "evidenceDate")]
+    pub evidence_date: String,
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -301,6 +324,13 @@ impl From<VaultItem> for VaultItemJson {
                 last_used: item.metadata.last_used.map(|dt| dt.to_rfc3339()),
                 usage_count: item.metadata.usage_count,
             },
+            confirmation_gate: item.confirmation_gate.map(|gate| ConfirmationGateJson {
+                reason: gate.reason,
+                evidence_date: gate.evidence_date,
+                status: match gate.status {
+                    ConfirmationGateStatus::PendingConfirmation => "pending_confirmation".to_string(),
+                },
+            }),
         }
     }
 }
@@ -349,6 +379,21 @@ impl TryFrom<VaultItemJson> for VaultItem {
             })
             .transpose()?;
 
+        let confirmation_gate = json
+            .confirmation_gate
+            .map(|gate| -> Result<ConfirmationGate, String> {
+                let status = match gate.status.as_str() {
+                    "pending_confirmation" => ConfirmationGateStatus::PendingConfirmation,
+                    _ => return Err(format!("Invalid confirmationGate.status: {}", gate.status)),
+                };
+                Ok(ConfirmationGate {
+                    reason: gate.reason,
+                    evidence_date: gate.evidence_date,
+                    status,
+                })
+            })
+            .transpose()?;
+
         Ok(VaultItem {
             key: json.key,
             value: json.value,
@@ -366,6 +411,7 @@ impl TryFrom<VaultItemJson> for VaultItem {
                 last_used,
                 usage_count: json.metadata.usage_count,
             },
+            confirmation_gate,
         })
     }
 }
