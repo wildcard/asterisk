@@ -266,6 +266,29 @@ checklist item still blocking readiness and why, sorted deterministically
 by family then checklist id. There is no separate "warnings vs. errors"
 tier: everything in `issues` is blocking, by design (fail-closed).
 
+### Generate an agent-friendly human-review packet
+
+`buildDossierReviewPacket` joins every blocking issue to its fixed checklist
+label and a deep-cloned copy of the current answer or repeatable section.
+`renderDossierReviewPacketMarkdown` turns that packet into a pasteable HITL
+document with one blank applicant-decision line per blocker:
+
+```ts
+import {
+  buildDossierReviewPacket,
+  renderDossierReviewPacketMarkdown,
+} from '@asterisk/core';
+
+const packet = buildDossierReviewPacket(dossier);
+const markdown = renderDossierReviewPacketMarkdown(packet);
+```
+
+Both functions are pure: they perform no I/O, never mutate or confirm a
+dossier answer, and do not access CEAC. The packet intentionally carries the
+candidate values and provenance needed for review, so JSON and Markdown
+serializations are private applicant data and must remain in a gitignored
+local directory. The opaque `applicantRef` is deliberately excluded.
+
 ## Local workflow for a real applicant
 
 A real dossier is never committed to this repository. See

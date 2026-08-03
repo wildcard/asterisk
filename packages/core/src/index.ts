@@ -85,6 +85,8 @@ export {
   buildSparseFillMappedOnlyDossier,
   cloneDossier,
   buildEmptyDossierSkeleton,
+  buildDossierReviewPacket,
+  renderDossierReviewPacketMarkdown,
 } from './ds160';
 export type {
   AnswerStatus,
@@ -105,4 +107,7 @@ export type {
   ReadinessIssueCode,
   ReadinessReport,
   FamilySummary,
+  DossierReviewItem,
+  DossierReviewFamily,
+  DossierReviewPacket,
 } from './ds160';

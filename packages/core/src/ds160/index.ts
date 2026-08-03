@@ -27,6 +27,8 @@ export {
   buildSparseFillMappedOnlyDossier,
   cloneDossier,
   buildEmptyDossierSkeleton,
+  buildDossierReviewPacket,
+  renderDossierReviewPacketMarkdown,
 } from './dossier';
 export type {
   AnswerStatus,
@@ -47,4 +49,7 @@ export type {
   ReadinessIssueCode,
   ReadinessReport,
   FamilySummary,
+  DossierReviewItem,
+  DossierReviewFamily,
+  DossierReviewPacket,
 } from './dossier';
