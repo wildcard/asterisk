@@ -39,7 +39,7 @@ missing completeness check.
 | Piece | Location |
 |---|---|
 | JSON model (`Dossier`, `DossierAnswer`, `RepeatableSection`, ...) | `packages/core/src/ds160/dossier/types.ts` |
-| Complete checklist catalog (~160 items across 19 families) | `packages/core/src/ds160/dossier/checklist.ts` |
+| Complete checklist catalog (~170 items across 19 families) | `packages/core/src/ds160/dossier/checklist.ts` |
 | Deterministic, fail-closed validator | `packages/core/src/ds160/dossier/validator.ts` (`validateDossierReadiness`) |
 | PII-free synthetic fixtures for tests | `packages/core/src/ds160/dossier/fixtures.ts` |
 | Empty-skeleton generator (the real local starting point) | `packages/core/src/ds160/dossier/skeleton.ts` (`buildEmptyDossierSkeleton`) |
@@ -70,39 +70,83 @@ application requires:
 
 - **Identity**: legal name, other names used, native-alphabet name,
   telecode, sex, marital status, date/place of birth, nationality, other
-  nationality, permanent residence elsewhere, national ID, U.S. SSN/ITIN.
+  nationality, permanent residence elsewhere, national ID, U.S. SSN/ITIN,
+  clan/tribe.
 - **Residency**: home and mailing address.
 - **Contact**: phone(s), email(s), social media (a representative closed
   set of named platforms plus an "other platforms" list).
 - **Passport**: type, number, book number, issuing location, issuance/
   expiration dates, lost/stolen document history.
 - **Travel**: purpose, specific vs. approximate plans, address while in the
-  U.S., who's paying, travel companions.
+  U.S., who's paying, travel companions, traveling as part of a group or
+  organization.
 - **Previous U.S. travel**: prior visits, U.S. driver's license, previously
-  issued visa, visa refusal, immigrant petitions filed.
+  issued visa (including visa number, same visa type, same issuing/
+  applying location, applying in the country of principal residence),
+  visa lost/stolen, visa cancelled/revoked, visa refusal, immigrant
+  petitions filed.
 - **U.S. contact**: person/organization, relationship, address, phone,
   email.
 - **Family**: parents, spouse/partner (conditional on marital status),
   other relatives in the U.S.
 - **Present and previous employment**: current occupation category and
-  employer details (conditional), full previous-employment history.
-- **Education, languages, country travel, organizations**: each a
-  repeatable section with an explicit coverage declaration.
+  employer details (address including state/province and postal code,
+  phone, monthly income - required for employed/self-employed, duties),
+  full previous-employment history (address including state/province and
+  postal code, phone, duties).
+- **Education**: institutions attended, including state/province and
+  postal code.
+- **Languages, country travel, organizations**: each a repeatable section
+  with an explicit coverage declaration.
 - **Specialized skills, military service, paramilitary involvement**: each
   a gated Yes/No with conditional detail.
-- **Security and background**: ~29 individual question families
-  (health, criminal, security-related/terrorism, immigration violations,
-  miscellaneous), each a boolean gate plus a conditional explanation -
-  every one of them, not a representative sample.
+- **Security and background**: ~31 individual question families
+  (health, criminal, security-related/terrorism, immigration violations -
+  including being the subject of a removal or deportation hearing,
+  distinct from failing to attend one or having already been removed -
+  miscellaneous, including public elementary/F-status or post-1996 public
+  secondary school attendance without reimbursement), each a boolean gate
+  plus a conditional explanation - every one of them, not a representative
+  sample.
 - **Application admin**: filing location, self- vs. other-completed
   (preparer details conditional), interpreter used (details conditional).
 
 Several items intentionally bundle closely-related DS-160 sub-questions
 into one structured answer (e.g. `previous_us_travel.visa_details` covers
-visa type/issue date/ten-print/same-location together) rather than
-inventing a checklist id for every CEAC micro-question - a representative,
-maintainable contract at the family granularity the acceptance criteria
-describe, consistent with the existing exact-mapping module's own stance.
+visa type/number/issue date/same-type/same-location/principal-residence/
+ten-print together) rather than inventing a checklist id for every CEAC
+micro-question - a representative, maintainable contract at the family
+granularity the acceptance criteria describe, consistent with the existing
+exact-mapping module's own stance. Distinct Yes/No questions with their
+own conditional "explain" follow-up (visa lost/stolen, visa cancelled/
+revoked, subject of a removal hearing, ...) each get their own checklist
+id instead, since those are independently true/false/inapplicable facts,
+not sub-fields of one answer.
+
+### Content-audit follow-up (2026-08-02)
+
+An independent content audit against the prior full DS-160 print found the
+checklist above was missing several explicit questions/subfields:
+traveling as part of a group/organization; previous visa number, same
+visa type, same issuing/applying location, applying in the country of
+principal residence, visa lost/stolen, visa cancelled/revoked; present
+and previous employer phone/state-province/postal-code (plus previous
+employer duties, and present employer monthly salary now required rather
+than optional for employed/self-employed applicants); education state/
+province and postal code; clan/tribe; being the subject of a removal or
+deportation hearing; and public elementary (F status) or post-1996 public
+secondary school attendance without reimbursement. All of these are now
+covered - see `checklist.ts` and the "omitted-question audit additions"
+test suite in `__tests__/dossier.test.ts`.
+
+This project does not have the original print artifact on hand to diff
+against mechanically; the fix above was driven by the audit's explicit
+findings, plus a best-effort manual re-check against general DS-160
+question-family knowledge for anything else obviously missing. That
+manual re-check did not surface further clear omissions, but - as with
+any representative, non-scraped contract - it is not a guarantee of exact
+1:1 completeness against the live form; further gaps may still surface
+from a future audit against the actual print.
 
 ## The JSON model
 

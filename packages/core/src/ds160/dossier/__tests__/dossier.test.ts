@@ -90,7 +90,7 @@ describe('DS160_READINESS_CHECKLIST catalog', () => {
     for (const family of EXPECTED_FAMILIES) {
       expect(counts.get(family) ?? 0, `family ${family} has too few checklist items`).toBeGreaterThan(0);
     }
-    expect(counts.get('security_background')).toBeGreaterThanOrEqual(50); // ~29 questions x (gate + explanation)
+    expect(counts.get('security_background')).toBeGreaterThanOrEqual(60); // ~31 questions x (gate + explanation)
   });
 
   it('gives every enum item a non-empty enumValues list', () => {
@@ -162,7 +162,7 @@ describe('buildCompleteSyntheticDossier (positive fixture)', () => {
   });
 
   it('produces a non-trivial confirmedCount (proves items were actually walked, not vacuously empty)', () => {
-    expect(report.confirmedCount).toBeGreaterThan(100);
+    expect(report.confirmedCount).toBeGreaterThan(110);
   });
 
   it('has a familySummary entry for every family with zero blocking items', () => {
@@ -198,7 +198,7 @@ describe('sparse and fill-mapped-only dossiers never produce ready: true', () =>
     const dossier = buildSparseFillMappedOnlyDossier();
     const report = validateDossierReadiness(dossier);
     expect(report.ready).toBe(false);
-    expect(report.issues.length).toBeGreaterThan(100);
+    expect(report.issues.length).toBeGreaterThan(150);
   });
 
   it('an entirely empty dossier (no answers, no repeatables) is not ready', () => {
@@ -228,7 +228,7 @@ describe('sparse and fill-mapped-only dossiers never produce ready: true', () =>
       checked += 1;
     }
     // Sanity: this loop actually exercised a large slice of the catalog, not zero items.
-    expect(checked).toBeGreaterThan(90);
+    expect(checked).toBeGreaterThan(100);
   });
 
   it('full-inventory coverage: removing any repeatable coverage declaration breaks readiness', () => {
@@ -245,7 +245,7 @@ describe('sparse and fill-mapped-only dossiers never produce ready: true', () =>
       expect(report.issues.some((i) => i.checklistId === item.id && i.code === 'missing')).toBe(true);
       checked += 1;
     }
-    expect(checked).toBeGreaterThan(5);
+    expect(checked).toBeGreaterThan(10);
   });
 });
 
@@ -742,5 +742,173 @@ describe('buildEmptyDossierSkeleton', () => {
     const report = validateDossierReadiness(skeleton);
     expect(report.ready).toBe(false);
     expect(report.issues.length).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================================
+// Omitted-question audit follow-up: an independent content audit against the
+// prior full DS-160 print found these question families were missing from
+// the checklist. Each gets a catalog-presence check plus a targeted
+// validator test proving it participates in fail-closed validation exactly
+// like every other item.
+// ============================================================================
+
+describe('omitted-question audit additions', () => {
+  it('travel.traveling_with_group gates travel.group_name', () => {
+    expect(getChecklistItem('travel.traveling_with_group')).toBeDefined();
+    const groupNameItem = getChecklistItem('travel.group_name');
+    expect(groupNameItem?.conditional).toEqual({ dependsOn: 'travel.traveling_with_group', equals: true });
+
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    expect((dossier.answers['travel.traveling_with_group'] as DossierAnswer).value).toBe(true);
+    delete dossier.answers['travel.group_name'];
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(report.issues.some((i) => i.checklistId === 'travel.group_name' && i.code === 'missing')).toBe(true);
+  });
+
+  it('previous_us_travel.visa_details carries visa number, same-visa-type, and principal-residence sub-fields', () => {
+    const item = getChecklistItem('previous_us_travel.visa_details');
+    const fieldKeys = (item?.fields ?? []).map((f) => f.key);
+    expect(fieldKeys).toEqual(
+      expect.arrayContaining(['visaNumber', 'sameVisaType', 'applyingSameLocation', 'applyingInCountryOfPrincipalResidence'])
+    );
+
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const details = dossier.answers['previous_us_travel.visa_details'] as DossierAnswer;
+    (details.value as Record<string, unknown>).sameVisaType = 'not-a-boolean';
+    const report = validateDossierReadiness(dossier);
+    expect(
+      report.issues.some((i) => i.checklistId === 'previous_us_travel.visa_details' && i.code === 'invalid_format')
+    ).toBe(true);
+  });
+
+  it('previous_us_travel.visa_ever_lost_or_stolen requires an explanation when true', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const answer = dossier.answers['previous_us_travel.visa_ever_lost_or_stolen'] as DossierAnswer;
+    answer.status = 'confirmed';
+    answer.value = true;
+    answer.provenance = { source: 'x', asOf: DOSSIER_AS_OF };
+    answer.review = { reviewed: true, reviewedAt: DOSSIER_AS_OF };
+    // The gate flipped from its clean-applicant default (false); its
+    // .explanation answer is still the stale not_applicable one from that
+    // default - clear it so the test isolates the "missing" path.
+    delete dossier.answers['previous_us_travel.visa_ever_lost_or_stolen.explanation'];
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some((i) => i.checklistId === 'previous_us_travel.visa_ever_lost_or_stolen.explanation' && i.code === 'missing')
+    ).toBe(true);
+  });
+
+  it('previous_us_travel.visa_ever_cancelled_or_revoked requires an explanation when true', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const answer = dossier.answers['previous_us_travel.visa_ever_cancelled_or_revoked'] as DossierAnswer;
+    answer.status = 'confirmed';
+    answer.value = true;
+    answer.provenance = { source: 'x', asOf: DOSSIER_AS_OF };
+    answer.review = { reviewed: true, reviewedAt: DOSSIER_AS_OF };
+    delete dossier.answers['previous_us_travel.visa_ever_cancelled_or_revoked.explanation'];
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some(
+        (i) => i.checklistId === 'previous_us_travel.visa_ever_cancelled_or_revoked.explanation' && i.code === 'missing'
+      )
+    ).toBe(true);
+  });
+
+  it('present_employment.employer_details requires phone, and monthlyIncome is now required (not optional)', () => {
+    const item = getChecklistItem('present_employment.employer_details');
+    const monthlyIncomeField = item?.fields?.find((f) => f.key === 'monthlyIncome');
+    expect(monthlyIncomeField?.optional).toBeFalsy();
+
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const details = dossier.answers['present_employment.employer_details'] as DossierAnswer;
+    const value = details.value as Record<string, unknown>;
+    delete value.monthlyIncome;
+    delete value.phone;
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    const issue = report.issues.find((i) => i.checklistId === 'present_employment.employer_details');
+    expect(issue?.code).toBe('invalid_format');
+  });
+
+  it('previous_employment.entries requires phone and dutiesDescription per entry', () => {
+    const item = getChecklistItem('previous_employment.entries');
+    const fieldKeys = (item?.fields ?? []).map((f) => f.key);
+    expect(fieldKeys).toEqual(expect.arrayContaining(['phone', 'stateOrProvince', 'postalCode', 'dutiesDescription']));
+
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const entry = getSection(dossier, 'previous_employment.entries').entries[0];
+    expect(entry).toBeDefined();
+    if (entry) delete (entry.answer.value as Record<string, unknown>).dutiesDescription;
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some((i) => i.checklistId === `previous_employment.entries[${entry?.entryId}]` && i.code === 'invalid_format')
+    ).toBe(true);
+  });
+
+  it('education.institutions carries optional stateOrProvince and postalCode sub-fields', () => {
+    const item = getChecklistItem('education.institutions');
+    const stateField = item?.fields?.find((f) => f.key === 'stateOrProvince');
+    const postalField = item?.fields?.find((f) => f.key === 'postalCode');
+    expect(stateField?.optional).toBe(true);
+    expect(postalField?.optional).toBe(true);
+
+    // Omitting both on a real entry must still pass - they're optional.
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const entry = getSection(dossier, 'education.institutions').entries[0];
+    if (entry) {
+      delete (entry.answer.value as Record<string, unknown>).stateOrProvince;
+      delete (entry.answer.value as Record<string, unknown>).postalCode;
+    }
+    const report = validateDossierReadiness(dossier);
+    expect(report.issues.some((i) => i.checklistId.startsWith('education.institutions'))).toBe(false);
+  });
+
+  it('identity.has_clan_or_tribe gates identity.clan_or_tribe', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    expect((dossier.answers['identity.has_clan_or_tribe'] as DossierAnswer).value).toBe(true);
+    delete dossier.answers['identity.clan_or_tribe'];
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(report.issues.some((i) => i.checklistId === 'identity.clan_or_tribe' && i.code === 'missing')).toBe(true);
+  });
+
+  it('security_background covers being the subject of a removal or deportation hearing, distinct from failed-to-attend and previously-removed', () => {
+    expect(getChecklistItem('security_background.subject_of_removal_or_deportation_hearing')).toBeDefined();
+    expect(getChecklistItem('security_background.subject_of_removal_or_deportation_hearing.explanation')).toBeDefined();
+    // Distinct ids from the pre-existing, related-but-different questions.
+    expect(getChecklistItem('security_background.failed_to_attend_removal_hearing')).toBeDefined();
+    expect(getChecklistItem('security_background.previously_removed_or_deported')).toBeDefined();
+
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const answer = dossier.answers['security_background.subject_of_removal_or_deportation_hearing'] as DossierAnswer;
+    answer.status = 'confirmed';
+    answer.value = true;
+    answer.provenance = { source: 'x', asOf: DOSSIER_AS_OF };
+    answer.review = { reviewed: true, reviewedAt: DOSSIER_AS_OF };
+    delete dossier.answers['security_background.subject_of_removal_or_deportation_hearing.explanation'];
+    const report = validateDossierReadiness(dossier);
+    expect(
+      report.issues.some(
+        (i) => i.checklistId === 'security_background.subject_of_removal_or_deportation_hearing.explanation' && i.code === 'missing'
+      )
+    ).toBe(true);
+  });
+
+  it('security_background covers public elementary (F status) / public secondary (post-1996) school attendance without reimbursement', () => {
+    const gateItem = getChecklistItem('security_background.public_school_attendance_without_reimbursement');
+    expect(gateItem).toBeDefined();
+    expect(gateItem?.valueKind).toBe('boolean');
+    expect(getChecklistItem('security_background.public_school_attendance_without_reimbursement.explanation')).toBeDefined();
+
+    const dossier = buildCompleteSyntheticDossier();
+    // Left at its clean-applicant default (false) - confirm it's accounted for and doesn't block readiness.
+    expect((dossier.answers['security_background.public_school_attendance_without_reimbursement'] as DossierAnswer).value).toBe(false);
+    const report = validateDossierReadiness(dossier);
+    expect(report.issues.some((i) => i.checklistId.startsWith('security_background.public_school_attendance'))).toBe(false);
   });
 });

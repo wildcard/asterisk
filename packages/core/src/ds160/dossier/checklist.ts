@@ -30,11 +30,16 @@
  * Scope note, consistent with `../fieldMap.ts`'s existing stance: several
  * items bundle closely-related DS-160 sub-questions into one structured
  * `object`-valued item (e.g. `previous_us_travel.visa_details` covers visa
- * type/issue date/ten-print/same-location in one answer) rather than
- * exploding every CEAC sub-question into its own checklist id. This keeps
- * the catalog a representative, maintainable contract at the *family*
- * granularity the acceptance criteria describe, rather than a guessed 1:1
- * replica of the live form's exact question count.
+ * type/number/issue date/same-type/same-location/principal-residence/
+ * ten-print in one answer) rather than exploding every CEAC sub-question
+ * into its own checklist id. This keeps the catalog a representative,
+ * maintainable contract at the *family* granularity the acceptance
+ * criteria describe, rather than a guessed 1:1 replica of the live form's
+ * exact question count. Distinct Yes/No questions with their own
+ * conditional "explain" follow-up (visa lost/stolen, visa cancelled/
+ * revoked, subject of a removal hearing, ...) each get their own id via
+ * `boolWithExplanation` instead, since those are independently
+ * true/false/inapplicable facts, not sub-fields of one answer.
  */
 
 export type ChecklistFamily =
@@ -217,6 +222,10 @@ gate('identity.has_us_taxpayer_id', 'identity', 'Has a U.S. Taxpayer ID number')
 scalar('identity.us_taxpayer_id', 'identity', 'U.S. Taxpayer ID number', 'string', {
   conditional: { dependsOn: 'identity.has_us_taxpayer_id', equals: true },
 });
+gate('identity.has_clan_or_tribe', 'identity', 'Has a clan or tribe affiliation to declare');
+scalar('identity.clan_or_tribe', 'identity', 'Clan/tribe', 'string', {
+  conditional: { dependsOn: 'identity.has_clan_or_tribe', equals: true },
+});
 
 // ============================================================================
 // residency - home and mailing address
@@ -356,6 +365,10 @@ repeatable('travel.companions', 'travel', 'Travel companions', [
   { key: 'fullName', valueKind: 'string' },
   { key: 'relationship', valueKind: 'string' },
 ]);
+gate('travel.traveling_with_group', 'travel', 'Is traveling as part of a group or organization');
+scalar('travel.group_name', 'travel', 'Group or organization name', 'string', {
+  conditional: { dependsOn: 'travel.traveling_with_group', equals: true },
+});
 
 // ============================================================================
 // previous_us_travel - prior visits, license, visa, refusal, petition
@@ -391,11 +404,20 @@ object(
   'Previous U.S. visa details',
   [
     { key: 'visaType', valueKind: 'string' },
+    { key: 'visaNumber', valueKind: 'string', optional: true },
     { key: 'issueDate', valueKind: 'date' },
+    { key: 'sameVisaType', valueKind: 'boolean' },
     { key: 'applyingSameLocation', valueKind: 'boolean' },
+    { key: 'applyingInCountryOfPrincipalResidence', valueKind: 'boolean' },
     { key: 'tenPrinted', valueKind: 'boolean' },
   ],
   { conditional: { dependsOn: 'previous_us_travel.previously_issued_visa', equals: true } }
+);
+boolWithExplanation('previous_us_travel.visa_ever_lost_or_stolen', 'previous_us_travel', 'Has ever had a U.S. visa lost or stolen');
+boolWithExplanation(
+  'previous_us_travel.visa_ever_cancelled_or_revoked',
+  'previous_us_travel',
+  'Has ever had a U.S. visa cancelled or revoked'
 );
 gate('previous_us_travel.visa_ever_refused', 'previous_us_travel', 'Has ever had a U.S. visa refused');
 object(
@@ -486,10 +508,13 @@ object(
     { key: 'employerName', valueKind: 'string' },
     { key: 'addressLine1', valueKind: 'string' },
     { key: 'city', valueKind: 'string' },
+    { key: 'stateOrProvince', valueKind: 'string', optional: true },
+    { key: 'postalCode', valueKind: 'string', optional: true },
     { key: 'country', valueKind: 'string' },
+    { key: 'phone', valueKind: 'string' },
     { key: 'jobTitle', valueKind: 'string' },
     { key: 'startDate', valueKind: 'date' },
-    { key: 'monthlyIncome', valueKind: 'string', optional: true },
+    { key: 'monthlyIncome', valueKind: 'string' },
     { key: 'dutiesDescription', valueKind: 'string' },
   ],
   {
@@ -509,11 +534,15 @@ repeatable(
     { key: 'employerName', valueKind: 'string' },
     { key: 'addressLine1', valueKind: 'string' },
     { key: 'city', valueKind: 'string' },
+    { key: 'stateOrProvince', valueKind: 'string', optional: true },
+    { key: 'postalCode', valueKind: 'string', optional: true },
     { key: 'country', valueKind: 'string' },
+    { key: 'phone', valueKind: 'string' },
     { key: 'jobTitle', valueKind: 'string' },
     { key: 'supervisorName', valueKind: 'string', optional: true },
     { key: 'startDate', valueKind: 'date' },
     { key: 'endDate', valueKind: 'date' },
+    { key: 'dutiesDescription', valueKind: 'string' },
   ],
   { conditional: { dependsOn: 'previous_employment.was_previously_employed', equals: true } }
 );
@@ -526,6 +555,8 @@ repeatable('education.institutions', 'education', 'Educational institutions atte
   { key: 'institutionName', valueKind: 'string' },
   { key: 'addressLine1', valueKind: 'string' },
   { key: 'city', valueKind: 'string' },
+  { key: 'stateOrProvince', valueKind: 'string', optional: true },
+  { key: 'postalCode', valueKind: 'string', optional: true },
   { key: 'country', valueKind: 'string' },
   { key: 'courseOfStudy', valueKind: 'string' },
   { key: 'startDate', valueKind: 'date' },
@@ -647,6 +678,10 @@ const SECURITY_QUESTIONS: Array<{ slug: string; label: string }> = [
   },
   { slug: 'failed_to_attend_removal_hearing', label: 'Has failed to attend a removal hearing within the last five years' },
   {
+    slug: 'subject_of_removal_or_deportation_hearing',
+    label: 'Has ever been the subject of a removal or deportation hearing',
+  },
+  {
     slug: 'unlawful_presence_or_visa_violation',
     label: 'Has been unlawfully present or otherwise violated the terms of a U.S. visa',
   },
@@ -656,6 +691,11 @@ const SECURITY_QUESTIONS: Array<{ slug: string; label: string }> = [
   {
     slug: 'renounced_citizenship_to_avoid_tax',
     label: 'Has renounced U.S. citizenship for the purpose of avoiding taxation',
+  },
+  {
+    slug: 'public_school_attendance_without_reimbursement',
+    label:
+      'Has attended a public elementary school (grades K-8) on F (student) nonimmigrant status, or a public secondary school (grades 9-12) after November 30, 1996 without reimbursing the school',
   },
 ];
 

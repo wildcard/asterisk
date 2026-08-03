@@ -188,7 +188,7 @@ The exact field-mapping/fill-plan mechanism above covers ~15 reusable
 fields - it was never meant to answer "is this applicant's whole
 application accounted for?" That completeness question is answered by a
 separate, additive module: see `docs/ds160-dossier-readiness.md` for the
-full DS-160 checklist (~160 items across every answer family), the
+full DS-160 checklist (~170 items across every answer family), the
 private-dossier JSON model, and the deterministic, fail-closed validator
 (`packages/core/src/ds160/dossier/`). Nothing about this file's mechanism
 changes - the dossier module sits upstream of it as a prerequisite

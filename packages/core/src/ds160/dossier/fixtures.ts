@@ -80,6 +80,7 @@ const VALUE_OVERRIDES: Record<string, unknown> = {
   'identity.marital_status': 'married',
   'identity.has_used_other_names': true,
   'identity.has_national_id': true,
+  'identity.has_clan_or_tribe': true,
   'passport.has_book_number': true,
   'passport.issuance_date': '2021-03-01',
   'passport.expiration_date': '2031-03-01',
@@ -91,6 +92,7 @@ const VALUE_OVERRIDES: Record<string, unknown> = {
   'present_employment.primary_occupation_category': 'employed',
   'contact.social_media.facebook.has_account': true,
   'application_admin.completed_by_self': true,
+  'travel.traveling_with_group': true,
 };
 
 /** Optional (non-conditional) items explicitly declared not applicable in the fixture. */
