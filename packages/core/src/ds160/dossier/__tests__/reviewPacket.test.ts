@@ -22,6 +22,11 @@ describe('buildDossierReviewPacket', () => {
     expect(second).toEqual(first);
     expect(first.blockingCount).toBe(report.issues.length);
     expect([...packetIds].sort()).toEqual(report.issues.map((issue) => issue.checklistId).sort());
+    for (const family of first.families) {
+      expect(family.items.map((item) => item.checklistId)).toEqual(
+        report.issues.filter((issue) => issue.family === family.family).map((issue) => issue.checklistId)
+      );
+    }
   });
 
   it('includes exact checklist labels and a deep-cloned current candidate without applicantRef', () => {
@@ -63,6 +68,32 @@ describe('buildDossierReviewPacket', () => {
     expect(item?.currentRepeatable).toEqual(section);
   });
 
+  it('resolves a bracketed repeatable-entry issue to its parent definition and section', () => {
+    const dossier = buildCompleteSyntheticDossier();
+    const repeatable = DS160_READINESS_CHECKLIST.find(
+      (item) => item.repeatable && (dossier.repeatables[item.id]?.entries.length ?? 0) > 0
+    );
+    if (!repeatable) throw new Error('test bug: expected a populated repeatable checklist item');
+    const section = dossier.repeatables[repeatable.id];
+    const entry = section?.entries[0];
+    if (!section || !entry) throw new Error(`test bug: expected populated repeatable section ${repeatable.id}`);
+    entry.answer.status = 'candidate';
+    entry.answer.review = { reviewed: false };
+
+    const packet = buildDossierReviewPacket(dossier);
+    const entryChecklistId = `${repeatable.id}[${entry.entryId}]`;
+    const item = packet.families.flatMap((family) => family.items)
+      .find((candidate) => candidate.checklistId === entryChecklistId);
+
+    expect(item).toMatchObject({
+      checklistId: entryChecklistId,
+      checklistBaseId: repeatable.id,
+      question: repeatable.label,
+      repeatable: true,
+    });
+    expect(item?.currentRepeatable).toEqual(section);
+  });
+
   it('returns an empty review queue for a ready dossier', () => {
     const packet = buildDossierReviewPacket(buildCompleteSyntheticDossier());
     expect(packet.ready).toBe(true);
@@ -81,6 +112,7 @@ describe('renderDossierReviewPacketMarkdown', () => {
     expect(markdown).toContain(`- Blocking issues: ${packet.blockingCount}`);
     expect(markdown.match(/- Applicant decision:/g)).toHaveLength(packet.blockingCount);
     expect(markdown).toContain('Not applicable only when the checklist permits it');
+    expect(markdown).toContain('## US Contact');
     for (const item of packet.families.flatMap((family) => family.items)) {
       expect(markdown).toContain(`\`${item.checklistId}\``);
       expect(markdown).toContain(`### ${item.question}`);

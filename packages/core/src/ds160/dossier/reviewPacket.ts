@@ -7,7 +7,7 @@
  * to CEAC or any browser automation.
  */
 
-import { DS160_READINESS_CHECKLIST, getChecklistItem } from './checklist';
+import { CHECKLIST_FAMILIES, getChecklistItem } from './checklist';
 import type { ChecklistFamily, ChecklistItemDef } from './checklist';
 import type { Dossier, DossierAnswer, RepeatableSection } from './types';
 import { validateDossierReadiness } from './validator';
@@ -87,7 +87,7 @@ function itemForIssue(dossier: Dossier, issue: ReadinessIssue): DossierReviewIte
  */
 export function buildDossierReviewPacket(dossier: Dossier): DossierReviewPacket {
   const report = validateDossierReadiness(dossier);
-  const familyOrder = new Map(DS160_READINESS_CHECKLIST.map((item, index) => [item.family, index]));
+  const familyOrder = new Map(CHECKLIST_FAMILIES.map((family, index) => [family, index]));
   const grouped = new Map<ChecklistFamily, DossierReviewItem[]>();
 
   for (const issue of report.issues) {
@@ -119,7 +119,7 @@ function jsonFence(value: unknown): string {
 }
 
 function humanizeFamily(family: ChecklistFamily): string {
-  return family.split('_').map((word) => word[0]?.toUpperCase() + word.slice(1)).join(' ');
+  return family.split('_').map((word) => word === 'us' ? 'US' : word[0]?.toUpperCase() + word.slice(1)).join(' ');
 }
 
 /** Render a pasteable Markdown HITL document without changing the dossier. */
