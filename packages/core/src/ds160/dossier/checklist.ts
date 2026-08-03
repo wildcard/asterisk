@@ -707,6 +707,7 @@ for (const q of SECURITY_QUESTIONS) {
 // application_admin - filing location and preparer/interpreter
 // ============================================================================
 
+gate('application_admin.photo_provided', 'application_admin', 'A visa photo is provided for the application');
 scalar('application_admin.filing_location', 'application_admin', 'Embassy/consulate applying at', 'string');
 gate('application_admin.completed_by_self', 'application_admin', 'Application was completed by the applicant themself');
 object(

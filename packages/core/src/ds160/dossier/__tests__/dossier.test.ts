@@ -776,6 +776,21 @@ describe('buildEmptyDossierSkeleton', () => {
 // ============================================================================
 
 describe('omitted-question audit additions', () => {
+  it('application_admin.photo_provided participates in fail-closed readiness', () => {
+    expect(getChecklistItem('application_admin.photo_provided')).toBeDefined();
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    delete dossier.answers['application_admin.photo_provided'];
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some(
+        (issue) =>
+          issue.checklistId === 'application_admin.photo_provided' &&
+          issue.code === 'missing'
+      )
+    ).toBe(true);
+  });
+
   it('travel.traveling_with_group gates travel.group_name', () => {
     expect(getChecklistItem('travel.traveling_with_group')).toBeDefined();
     const groupNameItem = getChecklistItem('travel.group_name');
