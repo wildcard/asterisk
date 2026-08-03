@@ -1,0 +1,6 @@
+# Real per-applicant dossier data - never commit. Only this .gitignore and
+# README.md are meant to be tracked; anything a human generates here (e.g.
+# dossier-local.json) is ignored by default - opt-in tracking, not opt-out.
+*
+!.gitignore
+!README.md

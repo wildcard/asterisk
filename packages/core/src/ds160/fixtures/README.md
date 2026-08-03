@@ -31,6 +31,12 @@ Previous U.S. Travel, and Security and Background sections are not yet
 covered at all - see beads issue `asterisk-0s1` for the tracked follow-up
 if/when they're added.
 
+This exact-mapping/fill-plan scope is distinct from the DS-160 dossier
+*readiness* checklist (`../dossier/`, `docs/ds160-dossier-readiness.md`),
+which does cover Family, Previous U.S. Travel, and every Security and
+Background question family - as a completeness check, not as reusable
+vault-fillable fields.
+
 ## Provenance of the form structure
 
 This fixture is a **representative structural contract** built from the

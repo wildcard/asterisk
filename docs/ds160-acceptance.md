@@ -182,6 +182,18 @@ this repository should infer or guess an employer name on the applicant's
 behalf - that value only ever comes from the applicant's own explicit,
 current confirmation.
 
+## Dossier readiness (completeness check, separate module)
+
+The exact field-mapping/fill-plan mechanism above covers ~15 reusable
+fields - it was never meant to answer "is this applicant's whole
+application accounted for?" That completeness question is answered by a
+separate, additive module: see `docs/ds160-dossier-readiness.md` for the
+full DS-160 checklist (~160 items across every answer family), the
+private-dossier JSON model, and the deterministic, fail-closed validator
+(`packages/core/src/ds160/dossier/`). Nothing about this file's mechanism
+changes - the dossier module sits upstream of it as a prerequisite
+readiness signal.
+
 ## Known limitations / follow-ups
 
 - Rust `VaultItem`/`ConfirmationGate` parity (`crates/vault/src/lib.rs`,

@@ -70,3 +70,39 @@ export {
   loadDs160VaultExampleFixture,
 } from './ds160';
 export type { Ds160FieldMapping, Ds160Section } from './ds160';
+
+// Export DS-160 dossier readiness model, checklist, and deterministic validator
+export {
+  DS160_READINESS_CHECKLIST,
+  CHECKLIST_FAMILIES,
+  getChecklistItem,
+  validateDossierReadiness,
+  resolveApplicability,
+  isValidIsoDate,
+  DOSSIER_FIXTURE_AS_OF,
+  buildCompleteSyntheticDossier,
+  loadCompleteDossierFixture,
+  buildSparseFillMappedOnlyDossier,
+  cloneDossier,
+  buildEmptyDossierSkeleton,
+} from './ds160';
+export type {
+  AnswerStatus,
+  AnswerProvenance,
+  ReviewState,
+  DossierAnswer,
+  RepeatableCoverage,
+  RepeatableEntry,
+  RepeatableSection,
+  Dossier,
+  ChecklistFamily,
+  ChecklistItemDef,
+  ConditionalRule,
+  FieldSpec,
+  ValueKind,
+  Applicability,
+  ReadinessIssue,
+  ReadinessIssueCode,
+  ReadinessReport,
+  FamilySummary,
+} from './ds160';
