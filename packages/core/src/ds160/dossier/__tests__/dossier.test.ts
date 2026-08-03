@@ -483,6 +483,28 @@ describe('conditional applicability resolves fail-closed', () => {
     );
   });
 
+  it('keeps a true-only dependent unresolved when its candidate gate value is false', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const gate = dossier.answers['previous_us_travel.previously_issued_visa'] as DossierAnswer;
+    gate.status = 'candidate';
+    gate.value = false;
+
+    const visaDetails = getChecklistItem('previous_us_travel.visa_details');
+    expect(visaDetails).toBeDefined();
+    if (visaDetails) {
+      expect(resolveApplicability(dossier, visaDetails)).toBe('unresolved');
+    }
+
+    const report = validateDossierReadiness(dossier);
+    expect(
+      report.issues.some(
+        (issue) =>
+          issue.checklistId === 'previous_us_travel.visa_details' &&
+          issue.code === 'conditional_unresolved'
+      )
+    ).toBe(true);
+  });
+
   it('resolveApplicability chains through a gate that is itself not_applicable', () => {
     // family.spouse_partner_details depends on identity.marital_status; the
     // complete fixture sets marital_status to 'married', so this branch is
