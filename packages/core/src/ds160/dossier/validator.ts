@@ -9,7 +9,10 @@
  * Fail-closed rules enforced here (see the acceptance criteria this module
  * implements, tracked in beads issue `asterisk-3z3`):
  *  - Missing, `candidate`, or `unknown` answers block readiness.
- *  - Unreviewed answers block readiness, even if otherwise confirmed.
+ *  - Unreviewed answers block readiness, even if otherwise confirmed. A
+ *    `reviewed: true` review state also requires a valid `reviewedAt` that
+ *    is not after `dossier.asOf` - a review claim with no (or a malformed,
+ *    or future-dated) timestamp is treated the same as not being reviewed.
  *  - `confirmed`/`candidate` answers without provenance block readiness.
  *  - Contradictory answers (a confirmed value where a conditional gate
  *    resolved "not applicable", or vice versa; an empty repeatable section
@@ -235,13 +238,17 @@ function checkProvenance(provenance: AnswerProvenance | undefined, dossierAsOf: 
   }
 }
 
-function checkReview(review: ReviewState | undefined, label: string, errors: string[]): void {
+function checkReview(review: ReviewState | undefined, dossierAsOf: string, label: string, errors: string[]): void {
   if (!review || review.reviewed !== true) {
     errors.push(`${label}: has not been reviewed`);
     return;
   }
-  if (review.reviewedAt !== undefined && !isValidIsoDate(review.reviewedAt)) {
-    errors.push(`${label}: review.reviewedAt must be a valid ISO 8601 date/time`);
+  if (!isValidIsoDate(review.reviewedAt)) {
+    errors.push(`${label}: review.reviewedAt is required and must be a valid ISO 8601 date/time when reviewed is true`);
+    return;
+  }
+  if (isValidIsoDate(dossierAsOf) && compareIsoDates(review.reviewedAt, dossierAsOf) > 0) {
+    errors.push(`${label}: review.reviewedAt (${review.reviewedAt}) is after the dossier's asOf (${dossierAsOf})`);
   }
 }
 
@@ -284,7 +291,7 @@ function checkAnswer(
       };
     }
     const errors: string[] = [];
-    checkReview(answer.review, label, errors);
+    checkReview(answer.review, dossierAsOf, label, errors);
     if (errors.length > 0) return { code: reviewIssueCode(answer), message: errors[0] as string };
     return undefined;
   }
@@ -293,7 +300,7 @@ function checkAnswer(
   if (answer.status === 'not_applicable') {
     if (itemLike.optional) {
       const errors: string[] = [];
-      checkReview(answer.review, label, errors);
+      checkReview(answer.review, dossierAsOf, label, errors);
       if (errors.length > 0) return { code: reviewIssueCode(answer), message: errors[0] as string };
       return undefined;
     }
@@ -323,7 +330,7 @@ function checkAnswer(
   }
 
   const reviewErrors: string[] = [];
-  checkReview(answer.review, label, reviewErrors);
+  checkReview(answer.review, dossierAsOf, label, reviewErrors);
   if (reviewErrors.length > 0) {
     return { code: reviewIssueCode(answer), message: reviewErrors[0] as string };
   }

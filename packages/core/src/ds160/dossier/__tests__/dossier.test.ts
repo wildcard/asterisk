@@ -298,6 +298,122 @@ describe('fail-closed answer status handling', () => {
 });
 
 // ============================================================================
+// review.reviewedAt is required (and validated) whenever reviewed is true -
+// missing, malformed, and future reviewedAt must all fail closed, on both
+// ordinary answers and the not_applicable/repeatable-coverage paths.
+// ============================================================================
+
+describe('review.reviewedAt is required and validated when reviewed is true', () => {
+  it('rejects reviewed: true with reviewedAt entirely absent on an ordinary confirmed answer', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const answer = dossier.answers['identity.given_names'] as DossierAnswer;
+    answer.review = { reviewed: true };
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some((i) => i.checklistId === 'identity.given_names' && i.code === 'invalid_format' && /reviewedAt/.test(i.message))
+    ).toBe(true);
+    expect(report.issues.some((i) => i.checklistId === 'identity.given_names' && i.code === 'unreviewed')).toBe(false);
+  });
+
+  it('rejects a malformed reviewedAt on an ordinary confirmed answer', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const answer = dossier.answers['identity.given_names'] as DossierAnswer;
+    answer.review = { reviewed: true, reviewedAt: 'not-a-date' };
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(report.issues.some((i) => i.checklistId === 'identity.given_names' && i.code === 'invalid_format')).toBe(true);
+  });
+
+  it('rejects a reviewedAt dated after the dossier asOf on an ordinary confirmed answer', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const answer = dossier.answers['identity.given_names'] as DossierAnswer;
+    answer.review = { reviewed: true, reviewedAt: '2099-01-01' };
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some((i) => i.checklistId === 'identity.given_names' && i.code === 'invalid_format' && /after/.test(i.message))
+    ).toBe(true);
+  });
+
+  it('accepts a reviewedAt equal to the dossier asOf date (boundary, not "future")', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const answer = dossier.answers['identity.given_names'] as DossierAnswer;
+    answer.review = { reviewed: true, reviewedAt: DOSSIER_AS_OF };
+    const report = validateDossierReadiness(dossier);
+    expect(report.issues.some((i) => i.checklistId === 'identity.given_names')).toBe(false);
+  });
+
+  it('rejects reviewed: true with reviewedAt absent on a not_applicable/optional answer', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const email = dossier.answers['us_contact.email'] as DossierAnswer;
+    expect(email.status).toBe('not_applicable');
+    email.review = { reviewed: true };
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some((i) => i.checklistId === 'us_contact.email' && i.code === 'invalid_format' && /reviewedAt/.test(i.message))
+    ).toBe(true);
+    expect(report.issues.some((i) => i.checklistId === 'us_contact.email' && i.code === 'unreviewed')).toBe(false);
+  });
+
+  it('rejects a future reviewedAt on a not_applicable/optional answer', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const email = dossier.answers['us_contact.email'] as DossierAnswer;
+    email.review = { reviewed: true, reviewedAt: '2099-01-01' };
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some((i) => i.checklistId === 'us_contact.email' && i.code === 'invalid_format' && /after/.test(i.message))
+    ).toBe(true);
+  });
+
+  it('rejects reviewed: true with reviewedAt absent on a repeatable coverage declaration', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const coverage = getSection(dossier, 'education.institutions').coverage;
+    coverage.review = { reviewed: true };
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some((i) => i.checklistId === 'education.institutions' && i.code === 'invalid_format' && /reviewedAt/.test(i.message))
+    ).toBe(true);
+    expect(report.issues.some((i) => i.checklistId === 'education.institutions' && i.code === 'unreviewed')).toBe(false);
+  });
+
+  it('rejects a malformed reviewedAt on a repeatable coverage declaration', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const coverage = getSection(dossier, 'education.institutions').coverage;
+    coverage.review = { reviewed: true, reviewedAt: 'not-a-date' };
+    const report = validateDossierReadiness(dossier);
+    expect(report.issues.some((i) => i.checklistId === 'education.institutions' && i.code === 'invalid_format')).toBe(true);
+  });
+
+  it('rejects a future reviewedAt on a repeatable coverage declaration', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const coverage = getSection(dossier, 'education.institutions').coverage;
+    coverage.review = { reviewed: true, reviewedAt: '2099-01-01' };
+    const report = validateDossierReadiness(dossier);
+    expect(
+      report.issues.some((i) => i.checklistId === 'education.institutions' && i.code === 'invalid_format' && /after/.test(i.message))
+    ).toBe(true);
+  });
+
+  it('rejects reviewed: true with reviewedAt absent on an individual repeatable entry', () => {
+    const dossier = cloneDossier(buildCompleteSyntheticDossier());
+    const entry = getSection(dossier, 'education.institutions').entries[0];
+    expect(entry).toBeDefined();
+    if (entry) entry.answer.review = { reviewed: true };
+    const report = validateDossierReadiness(dossier);
+    expect(report.ready).toBe(false);
+    expect(
+      report.issues.some(
+        (i) => i.checklistId === `education.institutions[${entry?.entryId}]` && i.code === 'invalid_format' && /reviewedAt/.test(i.message)
+      )
+    ).toBe(true);
+  });
+});
+
+// ============================================================================
 // Invalid formatting
 // ============================================================================
 
@@ -515,7 +631,7 @@ describe('repeatable sections and coverage declarations', () => {
     (mutated.answers['previous_us_travel.been_to_us_before'] as DossierAnswer).value = false;
     // Clear the now-inapplicable repeatable so it must be re-declared not_applicable.
     mutated.repeatables['previous_us_travel.visits'] = {
-      coverage: { status: 'not_applicable', review: { reviewed: true } },
+      coverage: { status: 'not_applicable', review: { reviewed: true, reviewedAt: DOSSIER_AS_OF } },
       entries: [],
     };
     const report = validateDossierReadiness(mutated);

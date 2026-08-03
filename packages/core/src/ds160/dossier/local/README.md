@@ -118,7 +118,7 @@ within the section:
     "review": { "reviewed": true, "reviewedAt": "2026-08-02" }
   },
   "entries": [
-    { "entryId": "entry-1", "answer": { "status": "confirmed", "value": { "...": "..." }, "provenance": { "...": "..." }, "review": { "reviewed": true } } },
+    { "entryId": "entry-1", "answer": { "status": "confirmed", "value": { "...": "..." }, "provenance": { "...": "..." }, "review": { "reviewed": true, "reviewedAt": "2026-08-02" } } },
     { "entryId": "entry-2", "answer": { "...": "..." } }
   ]
 }
